@@ -1,0 +1,29 @@
+digraph G {
+  rankdir=BT;
+  node [shape=box,fontname=Helvetica];
+
+  { rank = same; Lens, Prism }
+  { rank = same; PrimReview, PrimGetter, Iso }
+  { rank = same; Getter, Traversal1, AffTraversal, Review }
+
+  Equality -> Iso;
+  Iso -> Lens;
+  Iso -> Prism;
+  Lens -> Getter;
+  PrimGetter -> Getter;
+  Lens -> Traversal1;
+  Lens -> AffTraversal;
+  Traversal -> Setter;
+  Traversal -> Fold;
+  Getter -> AffFold;
+  Traversal1 -> Traversal;
+  Getter -> Fold1;
+  AffTraversal -> AffFold;
+  AffFold -> Fold; 
+  Fold1 -> Fold
+  Traversal1 -> Fold1;
+  Prism -> AffTraversal;
+  AffTraversal -> Traversal;
+  Prism -> Review;
+  PrimReview -> Review;
+}

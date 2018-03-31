@@ -1,0 +1,1 @@
+../../posts/2017-04-26-indexed-poptics.lhs

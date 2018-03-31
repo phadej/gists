@@ -1,0 +1,11 @@
+digraph G {
+  rankdir=BT;
+  node [shape=box,fontname=Helvetica];
+
+  { rank = same; Lens, Prism }
+
+  Iso -> Lens;
+  Iso -> Prism;
+  Prism -> Traversal;
+  Lens -> Traversal;
+}

@@ -1,0 +1,1 @@
+../../posts/2017-03-20-affine-traversal.lhs
