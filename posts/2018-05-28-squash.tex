@@ -100,8 +100,19 @@ As with
 \footnote{\url{http://oleg.fi/gists/posts/2018-05-12-singleton-container.html}},
 tell me if you have seen this construction in the wild!
 
-\newpage
-Note, that |Squash| doesn't let us turn a thing into something it isn't...
+\emph{Addendum}: As \texttt{Iceland\_jack} pointed on Twitter%
+\footnote{\url{https://twitter.com/Iceland_jack/status/1001081879045525504}}%
+\footnote{\url{https://twitter.com/Iceland_jack/status/1001083326965407745}}%,
+there is a
+\href{https://hackage.haskell.org/package/free-functors}{\texttt{free-functors}}%
+\footnote{\url{https://hackage.haskell.org/package/free-functors}}
+package on Hackage, and more is written about |Squash|:
+\begin{itemize}
+\item \url{http://comonad.com/reader/2015/domains-sets-traversals-and-applicatives/}
+\item \url{https://www.cs.ox.ac.uk/ralf.hinze/Kan.pdf}
+\end{itemize}
+
+\emph{Note}, that |Squash| doesn't let us turn a thing into something it isn't...
 \begin{code}
 newtype Squashed1 c f x = Squash1
     { getSquashed1 :: forall g. c g => (forall y. f y -> g y) -> g x }
