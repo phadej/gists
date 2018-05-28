@@ -1,0 +1,151 @@
+\documentclass[10pt,a4paper,pdftex]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+%\usepackage{fullpage}
+\usepackage{centernot}
+\usepackage{amsmath}
+\usepackage{amssymb,amsthm}
+\usepackage{mathrsfs} % mathscr
+\usepackage{mathtools} % coloneq
+\usepackage[makeroom]{cancel} % cancel
+\usepackage{color}
+\usepackage[a4paper,inner=3cm,outer=3cm,top=3cm,bottom=3cm,marginparsep=5mm,marginparwidth=3cm]{geometry}
+\usepackage{microtype}
+\usepackage{float}
+\usepackage[english]{babel}
+
+% footnotes
+\interfootnotelinepenalty=10000
+
+% agdaid
+\usepackage{xstring}
+\newcommand{\agdaid}[1]{\mathit{#1}}
+
+% TODO:
+\usepackage{prftree}
+% ftp://ftp.funet.fi/pub/TeX/CTAN/macros/latex/contrib/prftree/prftreedoc.pdf
+\setlength{\prfinterspace}{1.5em}
+\setlength{\prfrulenameskip}{0.3em}
+\setlength{\prflinethickness}{.4pt}
+
+% Verbatim
+\usepackage{fancyvrb}
+
+% Landscape
+\usepackage{lscape}
+
+% Colors
+\usepackage{xcolor}
+\definecolor{darkgreen}{rgb}{0,.5,0}
+\definecolor{darkblue}{rgb}{0,0,.5}
+
+% Fonts
+\usepackage{mathpazo}
+\usepackage{helvet}
+%\usepackage{courier}
+\usepackage{inconsolata}
+\usepackage{microtype}
+
+% graphics
+\usepackage{graphics}
+\DeclareGraphicsRule{*}{mps}{*}{}
+
+% tables
+\usepackage{booktabs}
+
+% braces
+\usepackage{stmaryrd}
+
+% bibliography
+\usepackage[square,sort&compress,numbers]{natbib}
+\bibliographystyle{acm}
+\renewcommand*{\bibfont}{\footnotesize}
+
+% lhs2TeX
+% \usepackage{poly}
+
+% enumerations
+\usepackage{enumitem}
+
+% stuff
+\usepackage{calc}
+
+% Unicode
+\usepackage{newunicodechar}
+\newunicodechar{ℕ}{\ensuremath{\mathbb{N}}}
+\newunicodechar{∀}{\ensuremath{\mathbb{\forall}}}
+\newunicodechar{′}{'}
+\newunicodechar{∷}{::}
+\newunicodechar{≡}{\ensuremath{\equiv}}
+\newunicodechar{→}{\ensuremath{\to}}
+\newunicodechar{⇒}{\ensuremath{\Rightarrow}}
+\newunicodechar{≤}{\ensuremath{\le}}
+\newunicodechar{⊔}{\ensuremath{\sqcup}}
+\newunicodechar{⊥}{\ensuremath{\bot}}
+\newunicodechar{₁}{\ensuremath{{}_1}}
+\newunicodechar{₂}{\ensuremath{{}_2}}
+\newunicodechar{λ}{\ensuremath{\lambda}}
+\newunicodechar{ℓ}{\ensuremath{\ell}}
+\newunicodechar{Γ}{\ensuremath{\Gamma}}
+\newunicodechar{Δ}{\ensuremath{\Delta}}
+\newunicodechar{∈}{\ensuremath{\in}}
+\newunicodechar{∘}{\ensuremath{\circ}}
+\newunicodechar{ε}{\ensuremath{\varepsilon}}
+\newunicodechar{τ}{\ensuremath{\tau}}
+\newunicodechar{σ}{\ensuremath{\sigma}}
+\newunicodechar{Σ}{\ensuremath{\Sigma}}
+\newunicodechar{⊤}{\ensuremath{\top}}
+\newunicodechar{⋆}{\ensuremath{\star}}
+
+% finnish unicode :P
+\newunicodechar{Ö}{\"O}
+\newunicodechar{Ä}{\"A}
+
+% References
+\usepackage[hyphens]{url}
+\usepackage[pdftex]{hyperref}
+\hypersetup{pdfborder={0 0 0}}
+\hypersetup{bookmarksnumbered=true}
+% The following line suggests the PDF reader that it should show the
+% first level of bookmarks opened in the hierarchical bookmark view.
+\hypersetup{bookmarksopen=true,bookmarksopenlevel=1}
+% Hyperref can also set up the PDF metadata fields. These are
+% set a bit later on, after the thesis setup.
+\hypersetup{colorlinks=true,linkcolor=darkgreen,urlcolor=darkblue}
+\usepackage[capitalize,nameinlink,noabbrev]{cleveref}
+
+% Theorems
+% http://en.wikibooks.org/wiki/LaTeX/Theorems
+
+% http://tex.stackexchange.com/questions/46258/how-to-get-correct-autoref-for-theorems
+%\theoremstyle{definition}
+%\newtheorem{definition}{Definition}[chapter]
+%\newtheorem{example}[definition]{Example}
+%\newtheorem{remark}[definition]{Remark}
+
+%\newcommand{\definitionautorefname}{Definition}
+%\newcommand{\exampleautorefname}{Definition}
+
+% Currently the English versions are used for the PDF file metadata
+% Set the PDF title
+%\hypersetup{pdftitle={\TITLE\ \SUBTITLE}}
+% Set the PDF author
+%\hypersetup{pdfauthor={\AUTHOR}}
+% Set the PDF keywords
+%\hypersetup{pdfkeywords={\KEYWORDS}}
+% Set the PDF subject
+%\hypersetup{pdfsubject={Master's Thesis}}
+
+% Geometry
+
+% Line height
+%\setlength{\baselineskip}{20mm}
+% \setlength{\linespread}{1.5}
+
+% paragraph style
+\setlength{\parindent}{0em}
+\setlength{\parskip}{0.3em}
+
+% pandoc
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}

@@ -8,7 +8,8 @@ import Control.Lens hiding (Context)
 import Control.Monad (when)
 import Control.Monad.State.Strict (State, runState)
 import Data.List (isPrefixOf)
-import Text.Pandoc (Pandoc)
+import Text.Pandoc (Pandoc, Block (..))
+import Text.Pandoc.Walk (walk)
 
 import Hakyll
 
@@ -57,7 +58,7 @@ main' renderFormulae = hakyll $ do
     --    compile copyFileCompiler
 
     -- build up tags
-    tags <- buildTags "posts/*" (fromCapture "tags/*.html")
+    tags <- buildTags postsPattern (fromCapture "tags/*.html")
 
     tagsRules tags $ \tag pattern -> do
         let title = "Posts tagged \"" ++ tag ++ "\""
@@ -76,11 +77,12 @@ main' renderFormulae = hakyll $ do
                 >>= loadAndApplyTemplate "templates/default.html" ctx
                 >>= relativizeUrls
 
-    match "posts/*" $ do
+    match postsPattern $ do
         route $ setExtension "html"
         let compiler
                 = pandocCompilerWithTransformM readerOpts writerOpts
                 $ renderFormulae pandocFormulaOptions
+                . pandocTransform
         compile $ compiler
             >>= loadAndApplyTemplate "templates/post.html"    (postCtxWithTags tags)
             >>= saveSnapshot "content"
@@ -91,7 +93,7 @@ main' renderFormulae = hakyll $ do
     create ["archive.html"] $ do
         route idRoute
         compile $ do
-            posts <- recentFirst =<< loadAll "posts/*"
+            posts <- recentFirst =<< loadAll postsPattern
             let archiveCtx =
                     listField "posts" postCtx (return posts) `mappend`
                     constField "title" "Archives"            `mappend`
@@ -106,7 +108,7 @@ main' renderFormulae = hakyll $ do
     create ["index.html"] $ do
         route idRoute
         compile $ do
-            posts <- recentFirst =<< loadAll "posts/*"
+            posts <- recentFirst =<< loadAll postsPattern
             let indexCtx =
                     listField "posts" postCtx (return posts) `mappend`
                     constField "title" "Oleg Grenrus"        `mappend`
@@ -127,6 +129,9 @@ main' renderFormulae = hakyll $ do
             posts <- recentFirst =<<
                 loadAllSnapshots "posts/*" "content"
             renderAtom feedConfiguration feedCtx posts
+
+postsPattern :: Pattern
+postsPattern = fromRegex "^posts/.*\\.(md|lhs|tex)$"
 
 -------------------------------------------------------------------------------
 -- Latex
@@ -165,7 +170,14 @@ readerOpts = PO.def
         & PO.disableExtension PO.Ext_hard_line_breaks
         & PO.enableExtension PO.Ext_fenced_code_attributes
         & PO.enableExtension PO.Ext_tex_math_dollars
+        & PO.enableExtension PO.Ext_literate_haskell
     }
+
+pandocTransform :: Pandoc -> Pandoc
+pandocTransform = walk (map block) where
+    block :: Block -> Block
+    block (CodeBlock (i, cs, kv) x) | null cs  = CodeBlock (i, ["haskell"], kv) x
+    block b = b
 
 -------------------------------------------------------------------------------
 -- Posts

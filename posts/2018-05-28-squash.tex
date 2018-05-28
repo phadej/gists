@@ -1,0 +1,142 @@
+\input{../preamble.tex}
+%include polycode.fmt
+%include forall.fmt
+%format <> = "\diamond"
+\begin{document}
+|Squashed c x| let a library writer provide |x| in "|c|-irrelevant" way to a
+library user.
+
+%if 0
+\begin{code}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RankNTypes #-}
+module Squash where
+import Control.Applicative (liftA2)
+import Control.Monad (void, liftM, liftM2)
+import Data.Monoid (Sum (..))
+import Data.Semigroup (Semigroup (..))
+import Data.Tree (Tree (..))
+import Data.Set (Set)
+import qualified Data.Set as Set
+\end{code}
+
+The definition is simple:
+%endif
+\begin{code}
+newtype Squashed c x = Squash
+    { getSquashed :: forall r. c r => (x -> r) -> r }
+\end{code}
+
+|Squashed| is almost like
+\href{https://hackage.haskell.org/package/transformers-0.5.5.0/docs/Control-Monad-Trans-Cont.html\#t:ContT}{|Cont|}%
+\footnote{\url{https://hackage.haskell.org/package/transformers-0.5.5.0/docs/Control-Monad-Trans-Cont.html\#t:ContT}} or
+\href{http://hackage.haskell.org/package/kan-extensions-5.1/docs/Control-Monad-Codensity.html\#t:Codensity}{|Codensity|}
+\footnote{\url{http://hackage.haskell.org/package/kan-extensions-5.1/docs/Control-Monad-Codensity.html\#t:Codensity}},
+so |Squashed| is a |Monad|:
+
+\begin{code}
+instance Monad (Squashed c) where
+    return x  = Squash ($ x)
+  
+    m >>= k   = Squash $ \bx ->
+        getSquashed m $ \a ->
+        getSquashed (k a) bx
+
+instance Applicative (Squashed c) where
+    pure    = return
+    liftA2  = liftM2
+instance Functor (Squashed c) where
+    fmap    = liftM
+\end{code}
+
+|Monad|-instance allows to work on the wrapped value, for example
+\begin{code}
+squashedTree' :: Squashed Monoid (Tree String)
+squashedTree' = pure $ Node "x" [ pure "yz", pure "foo" ]
+
+squashedTree :: Squashed Monoid (Tree Int)
+squashedTree = do
+    x <- squashedTree'
+    return (fmap length x)
+\end{code}
+However, we cannot \emph{extract} the original value, only as much as the
+constraint let us:
+\begin{code}
+-- 6
+example_1 :: Int
+example_1 = getSum (getSquashed squashedTree (foldMap Sum))
+
+-- [1,2,3]
+example_2 :: [Int]
+example_2 = getSquashed squashedTree (foldMap pure)
+\end{code}
+
+This restriction maybe be useful to enforce correctness, without
+relying on the module system!
+
+|Squash c x| is a generalised notion of "free |c| over |x|", e.g. |Monoid| as described
+in
+\href{http://comonad.com/reader/2015/free-monoids-in-haskell/}{Free Monoids in Haskell}%
+\footnote{\url{http://comonad.com/reader/2015/free-monoids-in-haskell/}}.
+It should be possible to write |c (Squashed c x)| instances for all (reasonable) |c|. Or actually
+|(forall x. c' x => c x) => c (Squashed c' a)| after
+\href{https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0018-quantified-constraints.rst}{Quantified Constraints -proposal}%
+\footnote{\url{https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0018-quantified-constraints.rst}}
+is implemented. (TODO: amend when we have the extension in released GHC).
+
+\begin{code}
+instance Semigroup (Squashed Semigroup x) where
+    a <> b = Squash $ \k -> getSquashed a k <> getSquashed b k
+
+instance Monoid (Squashed Monoid x) where
+  mempty       = Squash $ \ _  -> mempty
+  mappend a b  = Squash $ \k   -> getSquashed a k `mappend` getSquashed b k
+\end{code}
+
+As with
+\href{http://oleg.fi/gists/posts/2018-05-12-singleton-container.html}{Singleton containers}%
+\footnote{\url{http://oleg.fi/gists/posts/2018-05-12-singleton-container.html}},
+tell me if you have seen this construction in the wild!
+
+\newpage
+Note, that |Squash| doesn't let us turn a thing into something it isn't...
+\begin{code}
+newtype Squashed1 c f x = Squash1
+    { getSquashed1 :: forall g. c g => (forall y. f y -> g y) -> g x }
+squash1 :: f x -> Squashed1 c f x
+squash1 fx = Squash1 ($ fx)
+
+instance Monad (Squashed1 Monad f) where
+    return x  = Squash1 $ \ _ -> return x
+    m >>= k   = Squash1 $ \f ->
+        getSquashed1 m f >>= \y ->
+        getSquashed1 (k y) f
+
+instance Applicative (Squashed1 Monad f) where
+    pure    = return
+    liftA2  = liftM2
+instance Functor (Squashed1 Monad f) where
+    fmap    = liftM
+\end{code}
+... though we can foolishly think so:
+\begin{code}
+intSet' :: Squashed1 Monad Set Int
+intSet' = squash1 $ Set.fromList [1, 2, 3]
+
+intSet :: Squashed1 Monad Set Int
+intSet = intSet' >>= \ _ -> return 5
+
+-- [5,5,5]
+intList :: [Int]
+intList = getSquashed1 intSet Set.toList
+\end{code}
+So |Squash| let's only forget, not to "remember" anything new.
+
+By the way, this post is genuine Literate Haskell file, using \LaTeX, not Markdown.
+If interested on how, check
+\href{https://github.com/phadej/gists}{the gists repository}%
+\footnote{\url{https://github.com/phadej/gists}}.
+I'm weird, as after some point of markup complexity, I actually prefer \LaTeX.
+\end{document}

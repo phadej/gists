@@ -105,6 +105,11 @@ h2:hover a.anchor, h3:hover a.anchor {
     display: block;
 }
 
+section.footnotes * {
+	font-size: 0.8rem;
+	line-height: 100%;
+}
+
 /* Code hihglight */
 a.sourceLine { display: inline-block; line-height: 1.25; }
 a.sourceLine { pointer-events: none; color: inherit; text-decoration: inherit; }

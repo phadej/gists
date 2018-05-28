@@ -30,6 +30,7 @@ executable site
     , tagsoup
     , lens
     , pandoc                ^>= 2.1
+    , pandoc-types          ^>= 1.17
     , skylighting           ^>= 0.7.1
     , containers
     , mtl

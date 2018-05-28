@@ -1,7 +1,11 @@
-all : images
+PDFS := Squash
+
+all : images pdfs
 	cabal new-build gists:site
 	`cabal-plan list-bin site` rebuild
 	@echo file://`pwd`/_site/index.html
+
+pdfs : $(PDFS:%=pdf/%.pdf)
 
 images : 
 	mkdir -p images
@@ -12,7 +16,7 @@ images :
 	cp images-static/*.svg images
 
 repl:
-	cabal new-repl gists-runnable
+	cabal new-repl gists-runnable:lib:gists-literate
 
 watch :
 	cabal new-build gists:site
@@ -27,3 +31,15 @@ upload : all
 
 preview : all
 	dotenv -f .env -- rsync -avz --progress _site/ '$$STAGING'
+
+tmp/%.tex : pkg/literate/%.lhs
+	mkdir -p tmp
+	lhs2TeX $< > $@
+
+pdf/%.pdf : tmp/%.tex preamble.tex
+	mkdir -p pdf
+	pdflatex -draftmode -halt-on-error -output-directory=tmp $<
+	pdflatex -output-directory=tmp $<
+	cp tmp/$*.pdf pdf/$*.pdf
+ 
+

@@ -18,3 +18,5 @@ images-src/mpxerr.tex
 *.agdai
 dump-core/
 bench.html
+
+tmp/

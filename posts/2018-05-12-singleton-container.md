@@ -1,7 +1,7 @@
 ---
 title: Singleton containers
 author: Oleg Grenrus
-tags: lens
+tags: lens, notes
 ---
 
 Singleton containers, all `t a` values have a single `a` value in it.
