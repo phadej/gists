@@ -73,6 +73,30 @@ The first law is also violated:
 Just "foo"
 ```
 
+Pattern synonyms
+----------------
+
+We have to note, that as simply as you can construct lawless prisms,
+similarly simply you can construct "surprising" pattern synonyms
+
+```haskell
+{-# LANGUAGE PatternSynonyms, ViewPatterns #-}
+import Data.CaseInsensitive
+
+pattern CI :: FoldCase a => a -> CI a
+pattern CI a <- (foldedCase -> a) where CI a = mk a
+
+λ> case CI "FOO" of CI s -> s
+"foo"
+```
+
+That pattern will be surprising to downstream users, precisely because it's not
+injective, therefore even it looks like a constructor, it's not.
+
+For compiler writers it means, that expression `case P x of P y -> z`, where `P` is a
+pattern synonym, cannot be beta-reduced, but compiler needs to expand patterns first.
+(for a pattern synonym obeying prism laws, that would be safe to do).
+
 Dual: Surjectivity of Lens
 --------------------------
 
@@ -156,3 +180,8 @@ Proof.
   apply lawl1.
   Qed.
 ```
+
+Acknowledgements
+----------------
+
+Thanks to Alp Mestanogullari for suggesting a section about `PatternSynonyms`.
