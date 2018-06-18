@@ -12,7 +12,7 @@ The important property of constructors (and *lawful prisms*), is their
 injectivity.  Though the usual prism laws don't state that directly,
 injectivity property can be deduced.
 
-To quote `lens` documentation, the prisms laws are:
+To quote `lens`-library documentation, the prisms laws are:
 
 First, if I `review` a value with a `Prism` and then `preview`, I will get it back:
 
