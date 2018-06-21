@@ -1,0 +1,50 @@
+\documentclass{article}
+%include polycode.fmt
+
+\usepackage{hyperref}
+
+% in lhs2TeX.style there are
+%
+% \newcommand{\Conid}[1]{{\mathit #1}}
+% \newcommand{\Varid}[1]{{\mathit #1}}
+% \newcommand{\anonymous}{\_}
+%
+% We can renew these
+
+\usepackage{xcolor}
+\definecolor{darkred}{rgb}{.5,0,0}
+\definecolor{darkgreen}{rgb}{0,0.5,0}
+\definecolor{darkblue}{rgb}{0,0,.5}
+\definecolor{color4}{rgb}{0,.4,.4}
+\definecolor{color5}{rgb}{.4,.4,0}
+
+\renewcommand{\Conid}[1]{{\color{darkblue}\mathit #1}}
+
+% however types and constructors look the same, we can differentiate them though
+
+%format Foo = "{\color{darkred}\mathit Foo}"
+%format MkFoo = "{\color{darkgreen}\mathit Foo}"
+
+% Note how I "cheat" making MkFoo render as Foo!
+
+% We can also highlight operators
+%format + = "\mathbin{\color{color4}+}"
+
+% or symbols (note I also make thing look prettier)"
+%format plusFoo = "{\color{color5}\mathit plus_{Foo}}"
+%format ColorsInLhs2TeX = "{\text{Colors in lhs2\TeX}}"
+
+\begin{document}
+
+An example of colorful lhs2\TeX file.
+See the source at \url{TODO}, and the result at {TODO}
+
+\begin{code}
+module ColorsInLhs2TeX where
+
+newtype Foo = MkFoo Int
+
+plusFoo :: Foo -> Foo -> Int
+plusFoo (MkFoo n) (MkFoo m) = n + m
+\end{code}
+\end{document}

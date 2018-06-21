@@ -1,4 +1,4 @@
-PDFS := Squash
+PDFS := Squash ColorsInLhs2TeX
 
 all : images pdfs
 	cabal new-build gists:site

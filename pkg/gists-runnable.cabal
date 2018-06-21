@@ -20,7 +20,8 @@ library
   ghc-options:         -Wall -pgmL markdown-unlit
   build-tool-depends:  markdown-unlit:markdown-unlit
   reexported-modules: 
-    Squash
+    Squash,
+    ColorsInLhs2TeX
   exposed-modules:
     Achromatic
     TypeclassOptics
@@ -80,6 +81,7 @@ library gists-literate
   hs-source-dirs:      literate/
   exposed-modules:
     Squash
+    ColorsInLhs2TeX
   build-depends:
     base ^>=4.10.1,
     constraints,
