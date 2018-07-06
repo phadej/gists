@@ -66,6 +66,7 @@ library
     pointed,
     profunctors,
     semigroupoids,
+    servant,
     servant-server,
     splitmix,
     tagged,
