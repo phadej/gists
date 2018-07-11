@@ -61,6 +61,8 @@ data M : Ctx → Set where
    []  : M []
    _∷_ : R → {t : Ty} → {ts : Ctx} → M ts → M (t ∷ ts) 
 
+infixr 5 _∷_
+
 -- Variable of type t
 data Var (t : Ty) : (Γ : Ctx) → M Γ → M Γ → Set where
   -- variable consumes multiplicity
@@ -153,7 +155,7 @@ exJoin = lam (lam (app (app var1 var0) {!!}))
 --
 -- Term
 --   (A 0 ∷ (A 0 ⊸ A 0 ⊸ A 1) ∷ [])
---   (none ∷ (none ∷ []))
---   (none ∷ (none ∷ []))
+--   (none ∷ none ∷ [])
+--   (none ∷ none ∷ [])
 --   (A 0)
 ```
