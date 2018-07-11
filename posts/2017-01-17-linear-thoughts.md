@@ -1,6 +1,7 @@
 ---
 title: Linear thoughts
 author: Oleg Grenrus
+tags: linear
 ---
 
 I have been wondering about linear logic for a while, and after reading
