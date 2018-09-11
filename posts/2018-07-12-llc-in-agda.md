@@ -1,7 +1,7 @@
 ---
 title: Linear Lambda Calculus in Agda
 author: Oleg Grenrus
-tags: linear
+tags: linear, agda
 ---
 
 Haskell by day, Agda by Night.
