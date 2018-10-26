@@ -60,11 +60,11 @@ main' renderFormulae = hakyll $ do
     -- build up tags
     tags <- buildTags postsPattern (fromCapture "tags/*.html")
 
-    tagsRules tags $ \tag pattern -> do
+    tagsRules tags $ \tag patt -> do
         let title = "Posts tagged \"" ++ tag ++ "\""
         route idRoute
         compile $ do
-            posts <- recentFirst =<< loadAll pattern
+            posts <- recentFirst =<< loadAll patt
             let ctx = mconcat
                   [ constField "title" title
                   , constField "subtitle" ""
@@ -197,7 +197,7 @@ postCtxWithTags tags = tagsField "tags" tags `mappend` postCtx
 -------------------------------------------------------------------------------
 
 makeToc :: [TS.Tag String] -> [TS.Tag String]
-makeToc tags = TS.flattenTree tt3
+makeToc tags = TS.flattenTree tt4
   where
     tt0 = TS.tagTree tags
     (tt1, S _ ll hs) = runState
@@ -206,6 +206,9 @@ makeToc tags = TS.flattenTree tt3
 
     tt2 = tt1 & traverse . deepOf platedTagTree tocDiv %~ createToc
     tt3 = tt2 & traverse . deepOf (notA . platedTagTree) code %~ createCodeLink
+
+    -- not a toc, but changing a -> span in <pre><code>
+    tt4 = tt3 & traverse . deepOf platedTagTree preTag %~ changeAtoSpan
 
     -- process headers
     --
@@ -269,6 +272,7 @@ makeToc tags = TS.flattenTree tt3
             , TS.TagText t
             , TS.TagClose "a"
             , TS.TagClose "li"
+
             ] ++
             ts'
     createToc t = t
@@ -279,6 +283,11 @@ makeToc tags = TS.flattenTree tt3
             [ TS.TagBranch "a" [("href", "#" ++ idAttr)] ts ]
 
     createCodeLink t = t
+
+    changeAtoSpan :: TS.TagTree String -> TS.TagTree String
+    changeAtoSpan tt = tt & tagTreeStrs %~ change where
+        change "a" = "span"
+        change str = str
 
     h2or3 :: Traversal' (TS.TagTree String) (TS.TagTree String)
     h2or3 = tag (`elem` ["h2", "h3"]) (const True)
@@ -291,6 +300,9 @@ makeToc tags = TS.flattenTree tt3
 
     code :: Traversal' (TS.TagTree String) (TS.TagTree String)
     code = tag (== "code") (const True)
+
+    preTag :: Traversal' (TS.TagTree String) (TS.TagTree String)
+    preTag = tag (== "pre") (const True)
 
     tag :: Applicative f
         => (String -> Bool)              -- tag name
@@ -324,3 +336,9 @@ platedTagTree _ t@(TS.TagLeaf _)      = pure t -- don't treat leafs
 _TextTagLeaf :: Traversal' (TS.TagTree str) str
 _TextTagLeaf f (TS.TagLeaf (TS.TagText s)) = TS.TagLeaf . TS.TagText <$> f s
 _TextTagLeaf _ t = pure t
+
+-- Branch names
+tagTreeStrs :: Traversal' (TS.TagTree str) str
+tagTreeStrs f = go where
+    go (TS.TagLeaf tag)      = pure (TS.TagLeaf tag)
+    go (TS.TagBranch s a ts) = TS.TagBranch <$> f s <*> pure a <*> traverse go ts
