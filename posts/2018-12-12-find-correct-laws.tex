@@ -1,0 +1,1328 @@
+\documentclass{article}
+%include polycode.fmt
+
+\begin{document}
+
+\subsection{Introduction}
+
+In this post I'll try to convince you that optic laws (as in the \texttt{lens} package
+documentation) are the right ones. For example recall the \href{http://hackage.haskell.org/package/lens-4.17/docs/Control-Lens-Lens.html#t:Lens}{|Lens|} laws
+(law names come from alternative naming of the operations: |view = get| and |set = put|\footnote{but |get| and |put| clash with |MonadState| names}.
+
+\begin{itemize}
+\item \textbf{GetPut}: You get back what you put in:
+
+\begin{code}
+view l (set l v s) ≡ v
+\end{code}
+
+\item \textbf{PutGet}: Putting back what you got doesn't change anything:
+
+\begin{code}
+set l (view l s) s ≡ s
+\end{code}
+
+\item \textbf{PutPut}: Setting twice is the same as setting once:
+
+\begin{code}
+set l v' (set l v s) ≡ set l v' s
+\end{code}
+\end{itemize}
+
+Why there are these three laws (why three?).
+How we know these three laws are "enough",
+or that they don't require too much?
+
+The solution is to consider a representation which is obviously a |Lens| (or |Prism| or ...),
+but for which also the "laws" are obvious. Then when we write conversion functions
+between this and more concrete representation we'll find out what laws are needed.
+
+The |Iso| - an isomorphism is the simplest example.
+The concrete representation is
+
+\begin{code}
+data Iso s a = Iso { to :: s -> a, from :: a -> s }
+\end{code}
+
+But the an obvious definition in math world (citing \href{https://global.oup.com/academic/product/category-theory-9780199237180}{Awodey 2010}):
+In any category $\mathcal{C}$, an arrow $f : S \to A$ is called an \emph{isomorphism},
+if there is an arrow $g : A \to S$ in $\mathcal{C}$ such that
+$g \circ f \equiv 1_S$ and $f \circ g \equiv 1_A$.
+We write $S \cong A$ if there exists an isomorphism between $S$ and $A$.
+
+Here, the mathematical conditions tells precisely which laws are required,
+namely for a (\texttt{RecordWildCards} destructed) |Iso| fields:
+
+\begin{code}
+to . from ≡ id
+from . to ≡ id
+\end{code}
+
+The isomorphism case is trivial. In the post I'll go through more interesting
+optics:
+
+\begin{itemize}
+\item |Lens| and |Prism|. Their laws should not be surprising to people
+    familiar with \texttt{lens} library.
+    However we discover a new law for |Prism|.
+
+\item |Affine| (traversal). I discussed affine traversal in
+\href{2017-03-20-affine-traversal.html}{a post about them}
+and give laws in
+\href{2017-04-18-glassery.html#laws:affine-traversal}{Glassery}.
+These laws were written based purely on intuition, which we'll now verify.
+
+\item |Achroma|tic lens. There are
+  \href{2018-03-28-achromatic-lens.html}{my quickly written notes from March 2018}.
+  Turns out, I missed few bits.
+
+\item |Grate|. Russel O'Connor gives laws for a van Laarhoven Grate (a two functor variant) in
+\href{https://r6research.livejournal.com/28050.html}{Grate: A new kind of Optic}.
+We formulate them for "normal" Grates: |grate :: ((s -> a) -> b) -> t|.
+In the process we also learn more about |Grate|.
+\end{itemize}
+
+At the end we discuss a little about |Setter|s. And conclude the post
+with general thoughts.
+
+
+\subsection{Lens}
+
+A \emph{Lens} is a purely functional reference. Concrete |Lens| representation
+is
+
+\begin{code}
+data Lens s a = Lens { view :: s -> a, set :: s -> a -> s }
+\end{code}
+
+\textbf{Note:} Here and later we work with so called monomorphic optics,
+i.e. optics which don't allow type change.
+Hopefully I will lift this restriction in a future blog post.
+Also we swapped the arguments for |set|
+(in \texttt{lens} library |set :: ASetter s t a b -> b -> s -> t|).
+This version is easier to do math with
+(we will partially apply it).
+
+We claim that a |Lens| \emph{should be} a subject to the following three laws:
+
+\begin{itemize}
+\item |view (set s a) ≡ a|
+\item |set s (view s) ≡ s|
+\item |set (set s a) a' ≡ set s a'|
+\end{itemize}
+
+Let's show that the laws are both \emph{sound} (not asking too much)
+and \emph{complete} (asking enough). For that we'll need another representation
+of lenses: an existential formulation:
+
+\begin{equation}
+\quad \mathsf{Lens}\;S\;A = \exists C, S \cong C \times A
+\end{equation}
+
+This formulation isn't novel (e.g. Russel O'Connor have a footnote about affine traversal in
+\href{https://www.cambridge.org/core/journals/journal-of-functional-programming/article/representation-theorem-for-secondorder-functionals/4B782B0BB6EB53E53935D7A0F8432E8E}{\emph{A representation theorem for second-order functionals}}),
+but I haven't seen it used to highlight the laws.
+In \href{https://r6research.livejournal.com/23705.html}{Lenses Are Exactly the Coalgebras for the Store Comonad}
+the laws of a coalgebra for a comonad are used.
+As my category theory knowledge is not very deep, I find the "coalgebra for a comonad" intimidating.
+I don't know if and how "Lenses are the coalgebras for the costate comonad" is generalisable to other optics.
+Existential formulation on the other hand works \emph{for everything}.
+
+\subsubsection{Soundness}
+
+We can define |view| and |set| operations using existential formulation:
+
+\begin{equation}
+\begin{aligned}
+\quad &\mathsf{view} : S \to A \\
+      &\mathsf{view}\;s   = \mathsf{snd}\; (f\;s) \\
+      &\mathsf{set} : S \to A \to S \\
+      &\mathsf{set}\;s\;a = g\; (\mathsf{pair}\;(\mathsf{fst}\;(f\;s))\;a)
+\end{aligned}
+\end{equation}
+
+where $f : S \to C \times A$ is the forward direction, and $g : C \times A \to S $ is the backward direction of the isomorphism.
+
+We can prove that |Lens| laws are \emph{sound} by showing that this definitions satisfy the laws.
+For example the first \textbf{GetPut} law:
+
+\begin{equation}
+\begin{aligned}
+  \quad &\mathsf{view}\; (\mathsf{set}\; s\; a)                             &&\equivvia{ \text{definitions} } \\
+      &\mathsf{snd}\;(f\; (g\; (\mathsf{pair}\;(\mathsf{fst}\;(f\;s))\;a))) &&\equivvia{ f \circ g \equiv 1 } \\
+      &\mathsf{snd}\;(\mathsf{pair}\;(\mathsf{fst}\;(f\;s))\;a)             &&\equivvia{ \mathsf{snd}\;(\mathsf{pair}\;x\;y) = y } \\
+      &a                                                                    &&\;\blacksquare
+\end{aligned}
+\end{equation}
+
+The remaining \textbf{PutGet} and \textbf{PutPut} laws can be proved sound
+using similar direct calculation. In fact, I mechanized the proofs in this post;
+and soundness properties are proven mostly by a very simple tactic.
+
+\subsubsection{Completeness}
+
+The other direction, \emph{completeness}, is more interesting.
+Given $\mathsf{view} : S \to A$ and $\mathsf{set} : S \to A \to S$, such that
+the three laws above hold, construct a $\mathsf{Lens}\;S\;A$.
+
+The key insight is to pick the right "left overs" type $C$.
+I found the process of mechanizing proofs helpful, you will immediately rule out e.g. bare $S$.
+The $A \to S$ (partially applied $\mathsf{set}$) is better, but still too "big".
+We need to use a smaller, \emph{refined} type:
+
+\begin{equation}
+\quad C = \{ c : A \to S \mid \exists s : S, c \equiv \mathsf{set}\; s \}
+\end{equation}
+
+All three options make sense if you consider how |lens :: (s -> a) -> (s -> b -> t) -> Lens s t a b| can be defined using e.g. |Profunctor| encoding,
+\href{2017-04-18-glassery.html#v:lens}{Glassery} uses:
+
+\begin{code}
+lens :: (s -> a) -> (s -> b -> t) -> Lens s t a b
+lens getter setter pab = dimap
+     -- c = s
+     (\s -> (getter s, s))
+     (\(b, s) -> setter s b)
+     (first' pab)
+\end{code}
+
+but you can also write
+
+\begin{code}
+lens :: (s -> a) -> (s -> b -> t) -> Lens s t a b
+lens getter setter pab = dimap
+     -- c = b -> t; or refined
+     -- c = { f : b -> t | exists s. f = setter s }
+     (\s -> (getter s, setter s))
+     (\(b, f) -> f b)
+     (first' pab)
+\end{code}
+
+Anyway, after a $C$ is found, we can define an isomorphism.
+The arrows are defined as in the latter |Profunctor| example:
+
+\begin{equation}
+\begin{aligned}
+\quad &f : S \to C \times A \\
+      &f\; s = \mathsf{pair}\; (\mathsf{set}\;s \mid \mathsf{exists}\;s\;\mathsf{refl})\; (\mathsf{view}\; s) \\
+      &g : C \times A \to S \\
+      &g\;(\mathsf{pair}\; (c \mid -)\; a) = c\; a
+\end{aligned}
+\end{equation}
+
+The proof obligation for the $C$ refinement is not really an obligation at all, the equality is definitionally true ($\mathsf{refl}$).
+However, next we need to prove the isomorphism properties.
+The backwards direction is easy, it's essentially a \textbf{PutGet}-law:
+
+\begin{equation}
+\begin{aligned}
+\quad &g\; (f\; s) &&\equivvia{\text{definition of $f$}} \\
+      &g\; (\mathsf{pair}\; (\mathsf{set}\;s \mid \mathsf{exists}\;s\;\mathsf{refl})\; (\mathsf{view}\; s)) &&\equivvia{ \text{definition of $g$} } \\
+      &\mathsf{set}\;s\;(\mathsf{view}\;s) &&\equivvia{ \text{\textbf{PutGet}-law} } \\
+      &s &&\;\blacksquare
+\end{aligned}
+\end{equation}
+
+Forward direction is more involved. Here we will use proof irrelevance for the refinement proofs.
+Those proofs aren't computationally relevant, so this is justified.
+I think it's possible to encode these proofs in \href{https://homotopytypetheory.org/2018/12/06/cubical-agda/}{Cubical Agda}.
+I also use functional extensionality,
+but it's a theorem in Cubical Agda
+(it's used once in the following part of the proof, try to spot it!)
+We will need to use both \textbf{PutPut} and \textbf{GetPut} laws,
+for the both halves of the product (pair), respectively.
+
+\begin{equation}
+\begin{aligned}
+\quad &f\; (g\; (\mathsf{pair}\;(c \mid \mathsf{exists}\; s\; \mathit{proof})\;a)) &&\equivvia{ \text{definition of $g$} } \\
+      &f\; (c\; a) &&\equivvia{ \text{rewrite using $\mathit{proof}$} } \\
+      &f\; (\mathsf{set}\;s\; a) &&\equivvia{ \text{definition of $f$} } \\
+      &\mathsf{pair}\; (\mathsf{set}\; (\mathsf{set}\;s\; a) \mid -)\;(\mathsf{view}\;(\mathsf{set}\;s\;a)) &&\equivvia{ \text{definition of $g$} } \\
+\end{aligned}
+\end{equation}
+
+We continue by proving the equality of pair halves separately:
+
+\begin{equation}
+\begin{aligned}
+\quad &\mathsf{set}\; (\mathsf{set}\;s\; a)  &&\equivvia{ \text{\textbf{PutPut}-law} }  \\
+      &\mathsf{set}\;s  &&\equivvia{ \text{rewrite using $\mathit{proof}$} }  \\
+      &c &&\;\blacksquare_1
+\end{aligned}
+\end{equation}
+
+and the other half:
+
+\begin{equation}
+\begin{aligned}
+\quad &\mathsf{view}\;(\mathsf{set}\;s\;a) &&\equivvia{ \text{\textbf{GetPut}-law} }  \\
+      &a &&\;\blacksquare_2
+\end{aligned}
+\end{equation}
+
+This completes the completeness proof. We had to use all three laws.
+I'm sure that intuitively thinking the \textbf{PutPut}-law is simple to forget,
+but these calculations show that it is important.
+
+\subsubsection{Calculation of the laws}
+
+In previous subsections, we knew the right |Lens| laws (candidates) a prior.
+We only needed to verify that they are in fact the right ones.
+But what if we didn't knew the laws beforehand.
+Could we somehow calculate them?
+
+In the completeness proof, all branches ended up with the use of some law,
+however we \emph{knew} which $C$ to pick, so we end up with a proof goal which
+is exactly one of the laws we can use.
+Therefore, trying to write a completeness proof is not a direct calculation
+way, either we need to know the right existential type to use (in my opinion
+not entirely obvious), or which laws there possibly are.
+
+Unfortunately I don't have a definitive answer to this problem.
+A sketch of the idea is however to start with
+
+\begin{equation}
+\quad S \cong C \otimes A
+\end{equation}
+
+isomorphism, and try to massage it into something without $C$.
+Notice that we work in a category where all arrows are isomorphisms (\href{https://en.wikipedia.org/wiki/Groupoid}{groupoid}),
+therefore we use $\otimes$-tensor, not $\times-$product.
+
+If we assume that we have a
+\href{https://ncatlab.org/nlab/show/closed+monoidal+category#symmetric_closed_monoidal_category}{Symmetric closed monoidal groupoid},
+then we can use a property:
+
+\begin{equation}
+\quad    \mathrm{Hom}(C\otimes A, S) \cong \mathrm{Hom}(C,[ S, A] )
+\end{equation}
+
+to find out that $C$ and $[S,A] = A \leftrightarrow S$ are isomorphic.
+(And this is the hand-wavy part: I don't understand groupoids enough to say if above reasoning make any sense at all).
+We need to "remember" how to go back in $S \to A$ direction, not all $A \to S$ are invertible (e.g. |const someS|).
+That's one reasoning to $c = \mathsf{set}\; s$ refinement of $C = A \to S$.
+
+We could stop here, as we in fact calculated what existential $C$ we have to use
+(or at least could try).
+We can also continue, at this point we have
+
+\begin{equation}
+\quad S \cong (A \leftrightarrow S) \otimes A
+\end{equation}
+
+$C$-less representation of |Lens|. If we \emph{forget} the isomorphisms,
+the remainders are $S \to A \to S$ and $S \to A$ arrows (when we split the product),
+these are $\mathsf{set}$ and $\mathsf{view}$ arrows!
+So we went from existential to concrete representation of |Lens| without
+using Yoneda.
+(\href{https://dl.acm.org/citation.cfm?id=3236779}{What you needa know about Yoneda} is an interesting reed anyway!)
+
+But if we stick with this representation, then we can write down the laws too:
+If left-to-right direction is $s \mapsto (\mathsf{set}\;s, \mathsf{view}\;s)$ and
+the right-to-left is $(\mathsf{set}\;s, a) \mapsto \mathsf{set}\;s\;a$
+(here I hand-wave about, what the first half of the pair should be!) then we get
+
+\begin{equation}
+\begin{aligned}
+    s &= \mathsf{set}\;s\;(\mathsf{view}\;s)               && \textbf{PutGet} \\
+    \mathsf{set}\;s &= \mathsf{set}\;(\mathsf{set}\;s\;a)  && \textbf{PutPut} \\
+    a &= \mathsf{view}\;(\mathsf{set}\;a)                  && \textbf{GetPut}
+\end{aligned}
+\end{equation}
+
+Note how the \textbf{PutPut}-law is in contracted form, the form
+which we would preferred in the above |Lens| laws completeness proof
+(spoiler: that's where I used functional extensionality, if you haven't spotted it).
+
+\subsection{Prism}
+
+In this section we do similar soundness and completeness proofs for prisms.
+A \emph{Prism} is a \href{2018-06-19-prisms-are-constructors.html}{generalized constructor}.
+Concrete |Prism| representation is
+(|preview| and |review| are often called |match| and |build| respectively, I stick with \texttt{lens}-library vocabulary).
+
+\begin{code}
+data Prism s a = Prism { preview :: s -> Maybe a, review :: a -> s }
+\end{code}
+
+We claim that a |Prism| \emph{should be} a subject to the following two laws:
+
+\begin{itemize}
+\item \textbf{MatchBuild}: First, if I |review| a value and then |preview| I will get it back:
+
+    |preview (review a) ≡ Just a|
+
+\item \textbf{BuildMatch}: Second, if you can extract a value |a| using a |preview| from a value |s|, then the value |s| is completely described by a prism and |a|:
+
+    |preview s ≡ Just a ⇒ review a ≡ s|
+\end{itemize}
+
+The existential formulation of a |Prism| is similar to |Lens|',
+but instead of product we have a coproduct (or sum):
+
+\begin{equation}
+\quad \mathsf{Prism}\;S\;A = \exists D, S \cong D + A
+\end{equation}
+
+\subsubsection{Soundness}
+
+First step is to define |preview| and |review| operations for existential representation:
+
+\begin{equation}
+\begin{aligned}
+\quad &\mathsf{preview} : S \to \mathsf{Maybe}\;A \\
+      &\mathsf{preview}\;s   = \mathsf{either}\;(d \mapsto \mathsf{nothing})\;(a \mapsto \mathsf{just}\;a) \; (f\;s) \\
+      &\mathsf{review} : A \to S \\
+      &\mathsf{review}\;a = g\; (\mathsf{right}\;a)
+\end{aligned}
+\end{equation}
+
+where $f : S \to D + A$ is the forward direction, and $g : D + A \to S $ is the backward direction of the isomorphism.
+
+As with |Lens| none of the laws is hard to show sound.
+The first one is a direct computation:
+
+\begin{equation}
+\begin{aligned}
+\quad &\mathsf{preview}\; (\mathsf{review}\; a)                               &&\equivvia{\text{definitions}} \\
+      &\mathsf{either}\;(d \mapsto \mathsf{nothing})\;(a \mapsto \mathsf{just}\;a)\; (f\; (g\;(\mathsf{right}\; a)))  &&\equivvia{ f\circ g \equiv 1 } \\
+      &\mathsf{either}\;(d \mapsto \mathsf{nothing})\;(a \mapsto \mathsf{just}\;a)\; (\mathsf{right}\; a)  &&\equivvia{\text{$\mathsf{either}$ computation}} \\
+      &\mathsf{just}\;a  &&\;\blacksquare \\
+\end{aligned}
+\end{equation}
+
+and for the second one we need to prepare the precondition.
+The injectivity of constructors let's rule out the case when $f\;s = \mathsf{left}\;d$,
+because $\mathsf{nothing} \not\equiv \mathsf{just}\;x$.
+
+\begin{equation}
+\begin{aligned}
+\quad &\mathsf{preview}\; s\equiv\mathsf{just}\;a                 &&\equivvia{\text{definitions}} \\
+      &\mathsf{either}\;(d \mapsto \mathsf{nothing})\;(a \mapsto \mathsf{just}\;a) (f \;s) \equiv \mathsf{just}\;a &&\equivvia{\text{injectivity of constructors}} \\
+      &f\;s \equiv \mathsf{right}\;a  &&\;\blacksquare
+\end{aligned}
+\end{equation}
+
+using which we can prove the law itself
+
+\begin{equation}
+\begin{aligned}
+\quad & \mathsf{review}\; a          &&\equivvia{\text{definitions}} \\
+      & g\; (\mathsf{right }\; a)    &&\equivvia{\text{rewrite using a precondition}} \\
+      & g\; (f\; (\mathsf{just}\;s)) &&\equivvia{g \circ f \equiv 1}  \\
+      & s &&\;\blacksquare
+\end{aligned}
+\end{equation}
+
+\subsubsection{Completeness}
+
+We need to construct a $\mathsf{Prism}\;S\;A$ from the given
+$\mathsf{review} : A \to S$ and $\mathsf{preview} : S \to \mathsf{Maybe}\;A$.
+Here also, as in the |Lens| case, we need to pick the right type for the existential.
+And again we need a refined type:
+
+\begin{equation}
+    \quad D = \{ d : S \mid \mathsf{preview}\;d \equiv \mathsf{nothing} \}
+\end{equation}
+
+And yet again, that type can be found either from
+\href{http://oleg.fi/gists/posts/2017-04-18-glassery.html#v:prism}{|Profunctor| definition of |prism|}
+(the |either id setter|):
+
+\begin{code}
+prism :: (b -> t) -> (s -> Either t a) -> Prism s t a b
+prism setter getter = dimap getter (either id setter) . right'}
+\end{code}
+
+or by informal calculation
+
+\begin{equation}
+\quad S \cong D + A \Rightarrow D \cong S - A
+\end{equation}
+
+Then we can define the arrows of the isomorphism (I'm quite sure that smart enough proof search would find exactly these definitions):
+
+\begin{equation}
+\begin{aligned}
+\quad &f : S \to D + A \\
+      &f\; s = \mathsf{maybe\textnormal{-}case}\;(\mathsf{preview}\;s)\; (\mathit{proof} \mapsto \mathsf{left}\;(s \mid \mathit{proof}))\; (a\; \mathit{proof} \mapsto \mathsf{right}\; a)\\
+      &g : D + A \to S \\
+      &g\;(\mathsf{left}\; (s \mid - )) = s \\
+      &g\;(\mathsf{right}\; a) = \mathsf{review}\;a \\
+\end{aligned}
+\end{equation}
+
+We use non-standard $\mathsf{maybe\textnormal{-}case}$\footnote{
+Writing the definition using (dependent) |Maybe| elimination
+
+\begin{equation}
+\quad \mathsf{maybe\textnormal{-}elim} : \prod_{A : \star} \prod_{P : \mathsf{Maybe}\;A \to \star} \left( P\;\mathsf{nothing} \to \prod_{x : A} P\,(\mathsf{just}\;x) \to \prod_{m : \mathsf{Maybe}\;A} P\,m  \right)
+\end{equation}
+
+\begin{code}
+maybe-elim : ∀ {a b} {A : Set a}
+           → (P : Maybe A → Set b)
+           → P nothing
+           → ((x : A) → P (just x))
+           → (m : Maybe A)
+           → P m
+maybe-elim P n j (just x) = j x
+maybe-elim P n j nothing  = n
+\end{code}
+
+is a nice exercise. Something like that is what |remember| tactic would
+do in \emph{Coq}. Knowing what happens helps to write definitions by hand.
+}, which provides
+the match proofs too.
+yet it can be directly coded e.g. in Agda as:
+
+\begin{code}
+open import Data.Maybe
+open import Relation.Binary.PropositionalEquality
+
+maybe-case : ∀ {a b} {A : Set a} {B : Set b}
+           → (m : Maybe A)
+           → (m ≡ nothing → B)
+           → ((a : A) → m ≡ just a → B)
+           → B
+maybe-case (just a) f g = g a refl
+maybe-case nothing  f g = f refl
+\end{code}
+
+Next we can show that $f$ and $g$ are inverses. The $g \circ f \equiv 1$ case:
+
+\begin{equation}
+\begin{aligned}
+\quad & g\; (f\; s)          &&\equivvia{\text{definition of $f$}} \\
+      & g\; (\mathsf{maybe\textnormal{-}case}\;(\mathsf{preview}\;s)\; (\mathit{proof} \mapsto \mathsf{left}\;(s \mid \mathit{proof}))\; (a\; \mathit{proof} \mapsto \mathsf{right}\; a)) \\
+\end{aligned}
+\end{equation}
+
+which we can split: $\mathsf{preview}\;s \equiv \mathsf{none}$
+
+\begin{equation}
+\begin{aligned}
+\quad & g\; (\mathsf{left}\; (s \mid \mathit{proof}))  &&\equivvia{\text{definition of $g$}} \\
+      & s &&\;\blacksquare_1
+\end{aligned}
+\end{equation}
+
+and the second case $\mathsf{preview}\;s \equiv \mathsf{just}\;a$
+
+\begin{equation}
+\begin{aligned}
+\quad & g\; (\mathsf{right}\;a))  &&\equivvia{\text{definition of $g$}} \\
+      & \mathsf{review}\;a &&\equivvia{\text{\textbf{BuildMatch}-law}} \\
+      & s &&\;\blacksquare
+\end{aligned}
+\end{equation}
+
+The other direction of the isomorphism, $f \circ g \equiv 1$ has two cases:
+first $\mathsf{right}\; a$:
+
+\begin{equation}
+\begin{aligned}
+\quad & f\; (g\; (\mathsf{right}\;a))          &&\equivvia{\text{definition of $g$}} \\
+      & f\; (\mathsf{review}\;a)               &&\equivvia{\text{definition of $f$}} \\
+      & \mathsf{maybe\textnormal{-}case}\;(\mathsf{preview}\;(\mathsf{review}\;a))\; (\mathit{proof} \mapsto \mathsf{left}\;(s \mid \mathit{proof}))\; (a\; \mathit{proof} \mapsto \mathsf{right}\; a))
+                                               &&\equivvia{\text{\textbf{MatchBuild}-law}} \\
+      & \mathsf{maybe\textnormal{-}case}\;(\mathsf{just}\;a)\; (\mathit{proof} \mapsto \mathsf{left}\;(s \mid \mathit{proof}))\; (a\; \mathit{proof} \mapsto \mathsf{right}\; a))
+                                               &&\equivvia{\text{calculation of $\mathsf{maybe\textnormal{-}case}$}} \\
+      & \mathsf{right}\;a &&\;\blacksquare_1
+\end{aligned}
+\end{equation}
+
+and $\mathsf{left}\;(s \mid \mathit{proof})$
+
+\begin{equation}
+\begin{aligned}
+  \quad & f\; (g\; (\mathsf{left}\;(s \mid \mathit{proof}))       &&\equivvia{\text{definition of $g$}} \\
+      & f\; s                                          &&\equivvia{\text{definition of $f$}}  \\
+      & \mathsf{maybe\textnormal{-}case}\;(\mathsf{preview}\;s)\; (\mathit{proof} \mapsto \mathsf{left}\;(s \mid \mathit{proof}))\; (a\; \mathit{proof} \mapsto \mathsf{right}\; a)
+                                                       &&\equivvia{\text{using the $\mathit{proof} : \mathsf{preview}\;s \equiv \mathsf{nothing} $}} \\
+      & \mathsf{maybe\textnormal{-}case}\;\mathsf{nothing}\; (\mathit{proof} \mapsto \mathsf{left}\;(s \mid \mathit{proof}))\; (a\; \mathit{proof} \mapsto \mathsf{right}\; a)
+                                               &&\equivvia{\text{calculation of $\mathsf{maybe\textnormal{-}case}$}} \\
+      & \mathsf{left}\;(s \mid \mathit{proof}') && \equivvia{\text{proof-irrelevance}} \\
+      & \mathsf{left}\;(s \mid \mathit{proof}) &&\;\blacksquare
+\end{aligned}
+\end{equation}
+
+The |Prism| law proofs are only slightly more complex than |Lens| law;
+mainly due the need to do case analysis.
+
+One interesting point, is that we might want to have \textbf{MatchMatch} rule,
+using the |matching :: APrism s t a b -> s -> Either t a| combinator:
+\begin{code}
+matching p s ≡ Left t ⇒ matching p t ≡ t'
+\end{code}
+i.e. if a prism doesn't match, it shouldn't match second time either.
+
+we can state it using |preview| too, in a bit indirect way
+(this law is hard to property test):
+
+\begin{code}
+preview p s = None ⇒ (∀ a, review p a ≢ s)
+\end{code}
+i.e. if prism doesn't match (cannot |preview|) a |s| value,
+it cannot be created (|review|ed) with this prism.
+
+For example, take the type |T|:
+
+\begin{code}
+data T a = T1 a | T2 Int | T3 Int deriving (Eq, Show)
+
+instance Arbitrary a => Arbitrary (T a) where
+    arbitrary = oneof
+        [ T1 <$> arbitrary
+        , T2 <$> arbitrary
+        , T3 <$> arbitrary
+        ]
+\end{code}
+
+We can define wrong-looking |Prism| |_T1|
+
+\begin{code}
+_T1 :: Prism (T a) (T b) a b
+_T1 = prism T1 $ \t ->  case t of
+    T1 x -> Right x
+    T2 i -> Left (T3 i)
+    T3 i -> Left (T2 i)
+\end{code}
+
+which will pass the \texttt{QuickCheck} tests:
+
+\begin{code}
+matchBuild_prop :: Int -> Property
+matchBuild_prop x = preview _T1 (review _T1 x) === Just x
+
+buildMatch_prop :: T Int -> Property
+buildMatch_prop s = case preview _T1 s of
+    Just a  -> label "just" $ review _T1 a === s
+    Nothing -> label "nothing" True
+\end{code}
+
+but behave weirdly
+
+\begin{code}
+λ> matching _T1 (T1 'a')
+Right 'a'
+λ> matching _T1 (T2 42)
+Left (T3 42)
+λ> matching _T1 (T3 42)
+Left (T2 42)
+\end{code}
+
+or
+
+\begin{code}
+λ> over _T1 id (T2 42)
+T3 42
+\end{code}
+
+
+However, the \textbf{MatchMatch} property is clearly violated:
+
+\begin{code}
+matchMatch_prop :: T Int -> Property
+matchMatch_prop s = case matching _T1 s of
+    Right _ -> label "right" True
+    Left  t -> label "left" $ case matching _T1 t of
+        Right _  -> counterexample (show (t :: T Char)) False
+        Left  t' -> t === t'
+\end{code}
+
+as \texttt{QuickCheck} points out:
+
+\begin{code}
+λ> quickCheck matchMatch_prop
+*** Failed! Falsifiable (after 2 tests):
+T2 1
+T3 1 /= T2 1
+\end{code}
+
+Our verification process didn't needed this law, as we used |preview| and |review|
+as core |Prism| primitives.
+There are two ways to construct |Prism| in the \texttt{prism} library:
+
+\begin{code}
+prism  :: (b -> t) -> (s -> Either t a) -> Prism s t a b
+prism' :: (b -> s) -> (s -> Maybe    a) -> Prism s s a b
+\end{code}
+
+we use the latter |prism'| way. As you see it can construct only semi-monomorphic
+|Prism|. I think it's type should be restricted to return |Prism s s a a|.
+And we need to check the \textbf{MatchMatch} law for |Prism|s constructed with
+|prism|.
+
+\subsection{Affine}
+
+ I discussed affine traversal previously in
+\href{2017-03-20-affine-traversal.html}{a post about them}
+and gave laws in
+\href{2017-04-18-glassery.html#laws:affine-traversal}{Glassery}.
+
+\begin{itemize}
+\item You get back what you put in:
+
+|preview l (set l v s)  ≡ v <$ preview l s|
+
+\item If you can extract a value, and put it back, that doesn't change anything.
+
+|preview l s ≡ Just a ⇒ set l s a ≡ s|
+
+\item If you get nothing when extracting a value, then whatever you put in, the operation is no-op.
+
+|preview l s ≡ Nothing ⇒  set l s a ≡ s|
+
+\item Setting twice is the same as setting once:
+
+|set l v' (set l v s) ≡ set l v' s|
+\end{itemize}
+
+Turns out that the third law is not required in monomorphic setting,
+similarly as \textbf{MatchMatch}-laws isn't needed in the |Prism| case.
+
+In this section I won't show the full proofs, you can check (step through) the
+\emph{Coq} sources at \url{https://github.com/phadej/lens-laws}. Let's however
+highlight the main points.
+
+The concrete representation is the "worst" of |Lens| and |Prism|
+(where |Iso| would be the best of both):
+
+\begin{code}
+data Affine s a = Affine { preview :: s -> Maybe a; set :: s -> a -> s }
+\end{code}
+
+The existential representation explains the naming of this optic:
+
+\begin{equation}
+\quad \mathsf{Affine}\;S\;A = \exists C, D, S \cong D + C \times A
+\end{equation}
+
+Defining operations using existential representation, and proving
+soundness of the laws is a combination of above |Lens| and |Prism|
+proofs.
+
+The completeness proof is also similar to |Lens| and |Prism| proofs.
+The interesting part is what's the value of existential types, given
+$\mathsf{preview} : S \to \mathsf{Maybe}\;A$ and
+$\mathsf{set} : S \to A \to S$ we use:
+
+\begin{equation}
+\begin{aligned}
+\quad D &= \{ s : S \mid \mathsf{preview}\;s \equiv \mathsf{nothing} \} \\
+      C &= \{ c : S \to A \mid \exists s : S, \mathsf{set}\;s \equiv c \land \exists (a : A), \mathsf{preview}\;s \equiv \mathsf{just}\;a \}
+\end{aligned}
+\end{equation}
+
+These types are (again) very similar to the ones used in |Prism| and |Lens|
+completeness proofs.
+
+At this point it's good time to discuss some properties of optics we have covered so far:
+\begin{itemize}
+\item any |Iso| can be turned into |Lens|, |Prism| or |Affine|
+\item any |Lens| can be turned into |Affine|
+\item any |Prism| can be turned into |Affine|
+\item each class of optics is closed under composition
+\end{itemize}
+
+First three properties should be easy to see.
+For example take a $\mathsf{Lens}\;S\;A = \exists C, S\cong C \times A$,
+we can turn it into $\mathsf{Affine}\;S\;A = \exists C, D, S\cong D + C \times A$
+by taking $D = 0$ (|Void| in Haskell).
+
+The last property is not hard to verify either. $\mathsf{Iso}$ is clearly
+closed under composition (transitivity), $\mathsf{Lens}$ and $\mathsf{Prism}$
+need associativity of $+$ and $\times$, i.e.
+
+\begin{equation}
+  \quad C \times (C' \times A) \cong (C \times C') \times A
+  \qquad D + (D' + A) \cong (D + D') + A
+\end{equation}
+
+The |Affine| case is slightly trickier:
+
+\begin{equation}
+  \quad D + C \times (D' + C' \times A) \cong ((D + C \times D')+ (C \times C') \times A)
+\end{equation}
+
+Imagine (or try to write or look into \emph{Coq} proofs) the needed plumbing in the
+existential (or concrete) lens representations! It's very neat, that
+van Laarhoven and |Profunctor| encodings use uniform representations so
+all optics can share the same composition combinator, and that encoding is
+based on type-classes allowing automatic "upcasting" of optics.
+The downside is that encoding internals leak into error messages (though
+\url{https://github.com/mrkgnao/silica} demonstrates how that can be improved!)
+
+\subsection{Grate}
+
+Russell O'Connor and James Deikun discovered an optic called |Grate|
+\footnote{Russell writes "Until Edward Kmett comes up with a better name, let's call this new optic a |Grate|",
+three years later we are probably stuck with that name.}
+in \href{https://r6research.livejournal.com/28050.html}{Grate: A new kind of
+Optic}.  Using |Grate| we can |zipWithOf| structures. Essentially |Grate s a|
+witnesses that |s| is some kind of |Distributive| or |Representable| containing
+(always the same amount of) |a|s, and nothing else.
+
+It sounds like |Traversal|, but this optic is very different.
+The concrete representation is obscure:
+
+\begin{code}
+newtype Grate s a = Grate { grate :: ((s -> a) -> a) -> s) }
+\end{code}
+
+However its concrete representation is very simple
+(I guess the |Closed| subclass of |Profunctor| helped the discovery to happen):
+
+\begin{equation}
+\quad \mathsf{Grate}\;S\;A = \exists I, S \cong I \to A
+\end{equation}
+
+Our tasks is to discover the laws. Russell doesn't formulate them for
+concrete representation, checking
+\href{http://hackage.haskell.org/package/distributive-0.6/docs/Data-Distributive.html}{|Distributive| documentation}
+doesn't help either. We can write grate using existential encoding:
+
+\begin{equation}
+\begin{aligned}
+  \quad & \mathsf{grate} : ((S \to A) \to A) \to S \\
+        & \mathsf{grate}\; h = g\; (i \mapsto h\; (s \mapsto f\, s\, i))
+\end{aligned}
+\end{equation}
+where $f : S \to I \to A$ is the forward direction,
+$g : (I \to A) \to S $ is the backward direction of the isomorphism.
+Having this around will help us to rule too strong laws, the one
+we cannot fulfill (i.e. violate soundness).
+
+\subsubsection{Towards the laws: via completeness}
+
+The journey starts with a short detour. It turns out that stating the laws
+for |tabulate| and |index| construction is a lot easier.
+Also in this case we stay in \emph{Haskell98} as we don't need type families
+(|Representable| type-class has associated |type Rep f|)
+the index type will be existentially hidden away, i.e:
+
+\begin{code}
+fromRepresentable :: (s -> i -> a) -> ((i -> a) -> s) -> Grate s a
+fromRepresentable index tabulate = _exercise
+\end{code}
+
+is not hard to implement, and the required properties of |index| and |tabulate|
+are almost obvious: they have to be inverses.
+
+If you stare at |Grate| concrete representation and the types of |index| and
+|tabulate| (and implementation of |fromRepresentable|), you might see
+that |s -> a| acts as |i|, i.e. |grate| type is the similar to |tabulate|'s
+"give me a function from indices to elements, and I'll return you a whole container".
+This gives us something to try for a completeness proof:
+
+\begin{equation}
+\quad I_{\mathrm{wrong}} \stackrel{?}{=} S \to A
+\end{equation}
+
+We can define (possible) arrows of the isomorphism using $\mathsf{grate} : ((S \to A) \to A) \to S$,
+the implementation is (suspiciously) simple:
+
+\begin{equation}
+\begin{aligned}
+\quad &f : S \to I \to A \\
+      &f\; s\; i= i\; s \\
+      &g : (I \to A) \to S \\
+      &g\; = \mathsf{grate}
+\end{aligned}
+\end{equation}
+
+We have try to write a proof to see what properties $\mathsf{grate}$ must have
+to make $f$ and $g$ actually inverses.
+
+\begin{equation}
+\begin{aligned}
+\quad & g\; (f\; s) &&\equivvia{\text{definitions}} \\
+  & \mathsf{grate}\;((s'\,i \mapsto i\; s')\;s)  &&\equivvia{\text{calculation}} \\
+  & \mathsf{grate}\;(i \mapsto i\; s)
+\end{aligned}
+\end{equation}
+
+This proof obligation seems reasonable to require as the law,
+it's a special case of |tabulate (\i -> index a i)| |Representable| law:
+
+\textbf{TabulateIndex}: Tabulating by indexing doesn't change anything.
+
+\begin{code}
+grate g (\i -> i s) ≡ s
+\end{code}
+
+So far everything looks good. Let's try the other direction:
+
+\begin{equation}
+\begin{aligned}
+\quad & f\; (g\; h) &&\equivvia{\text{definitions}} \\
+  & (s\,i \mapsto i \,s)\;(\mathsf{grate}\;h) &&\equivvia{\text{calculation}} \\
+  & (i \mapsto i\; (\mathsf{grate}\;h)) &&\equivvia{\text{functional extensionality}} \\
+  & i\;(\mathsf{grate}\;h) &&\stackrel{?}{\equiv} h\; i
+\end{aligned}
+\end{equation}
+
+Can we require that as a law?
+
+\textbf{IndexTabulate}: Indexing into tabulated value gives a value at the index?
+
+\begin{code}
+i (grate f) ≡ f i
+\end{code}
+
+The answer is yes and no. There is a but. If we require the law as such,
+it's too strong. |i| and |f| are arbitrary!
+
+\begin{code}
+import Data.Functor.Identity
+import Test.QuickCheck
+import Test.QuickCheck.Instances
+
+newtype Grate s a = Grate { grate :: ((s -> a) -> a) -> s }
+
+identityGrate :: Grate (Identity a) a
+identityGrate = Grate (\f -> Identity (f runIdentity))
+
+law2example :: (Fun (Identity Int) (Int)) -> Property
+law2example (Fn i) = i (grate identityGrate f) === f i where
+    f :: (Identity Int -> Int) -> Int
+    f = const 42
+\end{code}
+
+I claim that |identityGrate| is lawful |Grate|, however |lawExample| |Property|
+doesn't hold, \texttt{QuickCheck} finds a counterexample immediately.
+|f| indeed can be arbitrary, but the indices |i| aren't!
+Only some values of $S \to A$ type are used, in |identityGrate| a single one: |runIdentity|.
+
+We have make small amendments to the previous. Each grate will have a
+associated predicate $\mathsf{P} : (S \to A) \to \mathsf{Prop}$ and the correct
+existential type $I$ is
+
+\begin{equation}
+\quad  I = \{ i : S \to A \mid P\; i \}
+\end{equation}
+
+Definitions of $f$ needs to be slightly changed to forget the refinement:
+
+\begin{equation}
+\begin{aligned}
+\quad &f : S \to I \to A \\
+      &f\; s\; (i \mid -)= i\; s \\
+\end{aligned}
+\end{equation}
+
+The $g$ need to be adjusted to, or actually the $\mathsf{grate}$ itself,
+its more precise type is (remember that in "good" languages,
+like \href{https://ucsd-progsys.github.io/liquidhaskell-blog/}{LiquidHaskell},
+refinement types are erased, i.e. don't have any runtime cost!)
+
+\begin{equation}
+  \quad \mathsf{grate} : (\{ i : S \to A \mid P\; i \} \to A) \to S
+\end{equation}
+
+The user of the library "should" provide a predicate $P$
+and verify that $\mathsf{grate}$ passes only functions satisfying
+that predicate. The final versions of two laws are:
+
+\begin{itemize}
+  \item \textbf{TabulateIndex}: Tabulating by indexing doesn't change anything.
+
+\begin{code}
+grate g (\i -> i s) ≡ s
+\end{code}
+
+\item \textbf{IndexTabulate}: Indexing into tabulated value gives a value at the index?
+
+\begin{code}
+i (grate f) ≡ f i  -- forall i such that P i holds
+\end{code}
+\end{itemize}
+
+For example, for above |Identity| example such predicate can be simply
+$P\;i = i \equiv \mathtt{runIdentity}$
+(can we encode this in LiquidHaskell, I  remember seeing some predicate support?)
+
+\begin{code}
+-- this holds (almost trivially)
+law2proper :: Int -> Property
+law2proper x = runIdentity (grate identityGrate f) === f runIdentity where
+    f :: (Identity Int -> Int) -> Int
+    f = const x
+\end{code}
+
+In general, for finite containers enumerating the all possible index values
+is the simplest way to define predicate $P$.
+There are \emph{some} indices, though the implementation hides them.
+
+\subsubsection{Soundness}
+
+Careful reader should notice that we have to do soundness proofs still.
+ We have two parts of the isomorphism
+$f : S \to I \to A$ is the forward direction,
+$g : (I \to A) \to S $ is the backward direction for some existential index type $I$;
+$\mathsf{grate}$ is defined using them.
+
+\textbf{TabulateIndex} holds almost trivially:
+
+\begin{equation}
+\begin{aligned}
+  \quad &\mathsf{grate}\;(i \mapsto i\; s) &&\equivvia{\text{definition of $\mathsf{grate}$}} \\
+        & g\; (i \mapsto (i' \mapsto i' s) \; (s' \mapsto f\, s'\, i))
+            &&\equivvia{\text{computation}} \\
+        & g\; (i \mapsto f\;s\; i)
+            &&\equivvia{g \circ f \equiv 1_S} \\
+        &s  &&\;\blacksquare
+\end{aligned}
+\end{equation}
+
+For \textbf{IndexTabulate} we have to define what is the $P$ for the
+existential formulation. We check how $\mathsf{grate}$
+is implemented (the unfolding is just in the above proof),
+what's the argument of $\mathsf{grate}$ is called with:
+
+\begin{equation}
+\quad  P\;i = \exists i' : I, i \equiv (s \mapsto f\;s\;i')
+\end{equation}
+
+Using this predicate, we can verify the law:
+
+\begin{equation}
+\begin{aligned}
+  \quad & i\;(\mathsf{grate}\;h) &&\equivvia{\text{definition of $\mathsf{grate}$}} \\
+  &i\;(g\; (i' \mapsto h\; (s \mapsto f\, s\, i')))
+      &&\equivvia{\text{rewrite using $P\,i = i \equiv (s \mapsto f\;s\;j)$ for some $j$}}\\
+  &f\;(g\; (i' \mapsto h\; (s \mapsto f\, s\, i')))\;j
+      &&\equivvia{f \circ g \equiv 1_{I\to A}} \\
+  &h\; (s \mapsto f\, s\, j)
+      &&\equivvia{\text{rewrite using $P$ in other direction}} \\
+  &h\; i
+      &&\;\blacksquare
+\end{aligned}
+\end{equation}
+
+This completeness the soundness proof. We now have discovered the |Grate| laws.
+As an exercise you could think about
+
+\begin{code}
+data V2 a = V2 a a
+
+_V2 :: Grate (V2 a) a
+_V2 = _grateExercise1
+
+silly :: Grate () a
+silly = _grateExercise2
+\end{code}
+
+\subsection{Achromatic}
+
+Achromatic lenses are "A lost of the bidirectional programming folks like a variant of lenses that have get, put, and create." (quote by Russell O'Connor).
+Originally, in \href{2018-03-28-achromatic-lens.html}{my notes} on achromatic lenses
+the concrete representation has three operations, I rename them all to be nicely
+six characters long and reflect the database-holy-grailness:
+(update could have |s -> (a -> a) -> s| type as well).
+
+\begin{code}
+data Achroma s a = Achroma
+    { select :: s -> a
+    , update :: s -> a -> s
+    , insert :: a -> s
+    }
+\end{code}
+
+I listed four laws, three |Lens| laws and one from |Prism| or |Iso|
+However I didn't notice to specify the last, fifth law.
+
+\begin{itemize}
+\item \textbf{SelectUpdate}
+
+\begin{code}
+select l (update l a s) ≡ a
+\end{code}
+
+\item \textbf{UpdateSelect}
+
+\begin{code}
+update l (select l s) s ≡ s
+\end{code}
+
+\item \textbf{UpdateUpdate}
+
+\begin{code}
+update l a' (update l a s) ≡ update l a' s
+\end{code}
+
+\item \textbf{SelectInsert}
+
+\begin{code}
+select l (insert l a) ≡ a
+\end{code}
+
+\item \textbf{UpdateInsert} \emph{new}
+
+\begin{code}
+update l (insert l a') a ≡ insert l a
+\end{code}
+\end{itemize}
+
+The existential representation for achromatic lens is almost like lenses':
+
+\begin{equation}
+\quad \mathsf{Achroma}\;S\;A = \exists C, S \cong 1 + C \times A
+\end{equation}
+
+It can be understood that $S$ might have $C$ or none of it at all.
+It turned out that to create $\mathsf{Achroma}$ from three lawful components,
+we also needed an extra bit:
+
+\begin{equation}
+\quad \mathsf{pristine} = \forall (s : S), \mathsf{Decidable}\;(\mathsf{update}\;s\equiv\mathsf{insert})
+\end{equation}
+
+in other words, we \emph{need to know}, for each $S$, whether it has those
+extra bits $C$.
+
+In the completeness proof I used the following value for $C$:
+
+\begin{equation}
+  \quad C = \{ c : A \to S \mid
+  \exists s : S, c = \mathsf{update}\;s \land \mathsf{update}\; s \not\equiv \mathsf{insert}
+  \}
+\end{equation}
+
+In Haskell implementation we don't care:
+
+\begin{code}
+type Optic p s t a b = p a b -> p s t
+
+class Profunctor p => PointedCartesian p where
+    pointedSecond :: p a b -> p (Maybe c, a) (Maybe c, b)
+
+achroma
+    :: forall p s t a b. PointedCartesian p
+    => (s -> a)       -- ^ select
+    -> (b -> t)       -- ^ insert
+    -> (s -> b -> t)  -- ^ update
+    -> Optic p s t a b
+achroma sa bt sabt
+    = dimap f g
+    . pointedSecond
+  where
+    -- note: always Just.
+    f :: s -> (Maybe (b -> t), a)
+    f s = (Just (sabt s), sa s)
+
+    g :: (Maybe (b -> t), b) -> t
+    g (Nothing,  b) = bt b
+    g (Just bt', b) = bt' b
+\end{code}
+
+We could try to implement a combinator checking whether the value is "pristine",
+i.e. could been created with |insert| directly:
+
+\begin{code}
+newtype Pristine a b = Pristine { unPristine :: a -> Bool }
+
+instance Profunctor Pristine where
+    dimap f _ (Pristine h) = Pristine (h . f)
+
+instance PointedCartesian Pristine where
+    pointedSecond (Pristine h) = Pristine $ \(m, a) -> isNothing m && h a
+
+pristine :: Optic Pristine s s a a -> s -> Bool
+pristine o s = unPristine (o (Pristine (const True))) s
+\end{code}
+
+But with our current version of |achroma|, |pristine| always returns |False|.
+If we add |pristine| to |achroma|:
+
+\begin{code}
+-- | better? concrete representation
+data Achroma' s a = Achroma'
+    { select'   :: s -> a
+    , update'   :: s -> a -> s
+    , insert'   :: a -> s
+    , pristine' :: s -> Bool
+    }
+
+-- | better? Profunctor encoding constructor
+achroma'
+    :: forall p s t a b. PointedCartesian p
+    => (s -> a)       -- ^ select
+    -> (b -> t)       -- ^ insert
+    -> (s -> b -> t)  -- ^ update
+    -> (s -> Bool)    -- ^ pristine
+    -> Optic p s t a b
+achroma' sa bt sabt pris
+    = dimap f g
+    . pointedSecond
+  where
+    f :: s -> (Maybe (b -> t), a)
+    f s = (if pris s then Nothing else Just (sabt s), sa s)
+
+    g :: (Maybe (b -> t), b) -> t
+    g (Nothing,  b) = bt b
+    g (Just bt', b) = bt' b
+\end{code}
+
+then |pristine| combinator will work, whenever way the value is created or modified.
+The |f| and |g| above are essentially the same as used in the completeness proof.
+
+Addition of |pristine| will add two more laws (or one, depends on how you count),
+which are encoded in the type of $\mathsf{pristine}$:
+
+\begin{itemize}
+\item \textbf{Pristine}
+\begin{code}
+pristine s ≡ True ⇒ update s a ≡ insert a
+\end{code}
+
+or alternatively as a variant of |Prism|'s \textbf{BuildMatch} law\footnote{
+in my previous notes I though that law doesn't hold: I didn't notice to specify the precondition}
+
+\begin{code}
+ pristine s ≡ True ⇒ s ≡ insert (select s)
+\end{code}
+
+\item \textbf{NotPristine}
+
+\begin{code}
+pristine s ≡ False ⇒ s ≢ insert (select s)
+\end{code}
+\end{itemize}
+
+The achromatic lens case illustrates again why it's important to think about laws;
+when making \href{2018-03-28-achromatic-lens.html}{notes} I didn't think about |pristine| case, for example.
+
+\subsection{Setter}
+
+The last section is about |Setter|s. They have only single operation |over|:
+
+\begin{code}
+newtype Setter s a = Setter { over :: (a -> a) -> (s -> s) }
+\end{code}
+
+What is its existential representation? Look at all other different optics
+we examined:
+
+\begin{equation}
+\begin{aligned}
+  \quad \mathsf{Iso}\;S\;A     =&&  S &\cong A  \\
+  \quad \mathsf{Lens}\;S\;A    =&& \exists C, S &\cong C \times A \\
+  \quad \mathsf{Prism}\;S\;A   =&& \exists D, S &\cong D + A \\
+  \quad \mathsf{Affine}\;S\;A  =&& \exists C, D, S &\cong D + C \times A \\
+  \quad \mathsf{Grate}\;S\;A   =&& \exists I, S &\cong I \to A \\
+  \quad \mathsf{Achroma}\;S\;A =&& \exists C, S &\cong 1 + C \times A
+\end{aligned}
+\end{equation}
+
+Hopefully the pattern stands out, namely $S$ is isomorphic to $F\,A$ for some
+\emph{endofunctor} $F$:
+
+\begin{equation}
+  \quad \mathsf{Setter}\;S\;A = \exists F : \mathsf{Endofunctor}, S \equiv F\,A
+\end{equation}
+
+Endofunctors can be composed, and there's an identity functor.
+All optics seems to be given by some (closed under composition) class of
+endofunctors. For example, |Traversal| is given by |Traversable| functors
+(whatever these are in category theoretical terms).
+
+That's the point which makes |Profunctor| encoding quite elegant,
+Look at the (stripped of) classes behind the implementation
+(there are no class for |Affine|, it's made simply by a |(Strong, Choice)|
+
+\begin{code}
+class Profunctor p where dimap    :: (a -> s) -> (t -> b) -> p a b -> p s t
+class Strong p     where second'  :: p a b -> p (c, a) (c, b)
+class Choice p     where right'   :: p a b -> p (Either d a) (Either d b)
+class Closed p     where closed   :: p a b -> p (i -> a) (i -> b)
+class PointedC p   where psecond' :: p a b -> p (Maybe c, a) (Maybe c, b)
+
+-- Setter
+class Mapping p    where map'      :: Functor f     => p a b -> p (f a) (f b)
+
+-- Traversal
+class Traversing p where traversed :: Traversable f => p a b -> p (f a) (f b)
+\end{code}
+
+It also explains why various |Functor| classes are enough to implement
+\emph{simple} (i.e. not type-changing, as in this post) optics, described in
+\href{2017-12-23-functor-optics.html}{Functor optics -post}.
+
+Now is possible to consistently invent (or discover?) new optics,
+for example |LensGrate|, combination of |Lens| and |Grate|
+(I remember seeing it in some library):
+
+\begin{equation}
+  \quad \mathsf{LensGrate}\;S\;A = \exists C,I, S \cong C \times (I \to A)
+\end{equation}
+
+Does it have some handy operations still, or does it degenerate to |Setter|?
+Or |PrismGrate|, which can still |review| things: try to verify that
+this class is closed under composition:
+
+\begin{equation}
+  \quad \mathsf{PrismGrate}\;S\;A = \exists D,I, S \cong D + (I \to A)
+\end{equation}
+
+I think |AffineGrate| is practically as useful as |Setter|, but you can
+still speak about it. |AchromaticGrate| seems to be useful
+concept, we can implement a variant of |view| for it, as there's
+a single index which stands out (and e.g |silly| isn't an |AchromaticGrate|):
+
+\begin{equation}
+  \quad \mathsf{AchromaticGrate}\;S\;A = \exists I, S \cong (1 + I) \to A
+\end{equation}
+
+Or we can have |FiniteGrate|, where index is some finite set.
+Representing the index with $\mathsf{Fin}\;n$ gives us an \emph{order},
+so we can |traverseOf| |FiniteGrate|. However, |Traversal|'s aren't
+|FiniteGrate|s (exercise!)
+
+\begin{equation}
+  \quad \mathsf{FiniteGrate}\;S\;A = \exists n : \mathbb{N}, S \cong \mathsf{Fin}\,n \to A
+\end{equation}
+
+So many new or at least not well known optics, that we completely forgot
+to talk about |Setter| laws. They aren't surprising, when we know
+the existential encoding:
+
+\begin{itemize}
+\item \textbf{OverIdentity}
+\begin{code}
+over id ≡ id
+\end{code}
+
+\item \textbf{OverComposition}
+\begin{code}
+over f . over g ≡ over (f . g)
+\end{code}
+\end{itemize}
+
+Proofs of their soundness and completeness can be found in
+\href{https://github.com/phadej/lens-laws}{Coq formalisation},
+or you can try to write them yourself as an exercise.
+
+\subsection{Conclusion}
+
+In this blog post we presented a results of formalization of some
+optic laws. Thinking about laws paid off, among other things we
+
+\begin{itemize}
+\item discovered \textbf{MatchMatch}-law for |Prism|s,
+\item discovered a \textbf{UpdateInsert} law, as well
+  as possible new core operation |pristine| for |Achroma|s.
+\item formulated laws for |grate| operation of |Grate|.
+\end{itemize}
+
+Also in the |Setter| section we discussed some other not well known optics.
+
+A lot from a single insight of requiring the isomorphism
+(and not only a equivalence, i.e. bare back and forth arrows without requiring them to be inverses)
+in the existential formulation of optics.
+
+Hopefully you enjoyed the read, and this blog post gave you some food for
+thought!
+
+\end{document}

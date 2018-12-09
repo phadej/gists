@@ -147,10 +147,13 @@ pandocFormulaOptions = def
         { LaTeX.preamble = concat
             [ "\\usepackage{amsmath}"
             , "\\usepackage{amssymb}"
+            , "\\usepackage{amsthm}"
             , "\\usepackage{amsfonts}"
             , "\\usepackage{stmaryrd}"
             , "\\usepackage{mathpazo}"
             , "\\usepackage{mathtools}"
+            -- proofs (find-right-laws)
+            , "\\newcommand{\\equivvia}[1]{\\equiv\\!\\!\\langle\\ #1\\ \\rangle}"
             ]
         }
 
