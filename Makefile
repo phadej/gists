@@ -41,5 +41,3 @@ pdf/%.pdf : tmp/%.tex preamble.tex
 	pdflatex -draftmode -halt-on-error -output-directory=tmp $<
 	pdflatex -output-directory=tmp $<
 	cp tmp/$*.pdf pdf/$*.pdf
- 
-
