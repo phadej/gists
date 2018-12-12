@@ -266,7 +266,7 @@ but these calculations show that it is important.
 
 \subsubsection{Calculation of the laws}
 
-In previous subsections, we knew the right |Lens| laws (candidates) a prior.
+In previous subsections, we knew the right |Lens| laws (candidates) a priori.
 We only needed to verify that they are in fact the right ones.
 But what if we didn't knew the laws beforehand.
 Could we somehow calculate them?
@@ -553,7 +553,7 @@ mainly due the need to do case analysis.
 One interesting point, is that we might want to have \textbf{MatchMatch} rule,
 using the |matching :: APrism s t a b -> s -> Either t a| combinator:
 \begin{code}
-matching p s ≡ Left t ⇒ matching p t ≡ t'
+matching p s ≡ Left t ⇒ matching p t ≡ Left t'
 \end{code}
 i.e. if a prism doesn't match, it shouldn't match second time either.
 
@@ -768,10 +768,10 @@ It sounds like |Traversal|, but this optic is very different.
 The concrete representation is obscure:
 
 \begin{code}
-newtype Grate s a = Grate { grate :: ((s -> a) -> a) -> s) }
+newtype Grate s a = Grate { grate :: ((s -> a) -> a) -> s }
 \end{code}
 
-However its concrete representation is very simple
+However its existential representation is very simple
 (I guess the |Closed| subclass of |Profunctor| helped the discovery to happen):
 
 \begin{equation}
@@ -791,7 +791,7 @@ doesn't help either. We can write grate using existential encoding:
 \end{equation}
 where $f : S \to I \to A$ is the forward direction,
 $g : (I \to A) \to S $ is the backward direction of the isomorphism.
-Having this around will help us to rule too strong laws, the one
+Having this around will help us to rule out too strong laws, the one
 we cannot fulfill (i.e. violate soundness).
 
 \subsubsection{Towards the laws: via completeness}
@@ -1068,7 +1068,7 @@ update l (insert l a') a ≡ insert l a
 The existential representation for achromatic lens is almost like lenses':
 
 \begin{equation}
-\quad \mathsf{Achroma}\;S\;A = \exists C, S \cong 1 + C \times A
+\quad \mathsf{Achroma}\;S\;A = \exists C, S \cong (1 + C) \times A
 \end{equation}
 
 It can be understood that $S$ might have $C$ or none of it at all.
