@@ -550,98 +550,73 @@ and $\mathsf{left}\;(s \mid \mathit{proof})$
 The |Prism| law proofs are only slightly more complex than |Lens| law;
 mainly due the need to do case analysis.
 
-One interesting point, is that we might want to have \textbf{MatchMatch} rule,
-using the |matching :: APrism s t a b -> s -> Either t a| combinator:
+One interesting point, is that we might want to have third, \textbf{MatchMatch} law.
+There is polymorphic |matching :: APrism s t a b -> s -> Either t a| combinator.
+Using its (non-existing in \texttt{lens}) monomorphic version |matching' :: APrism' :: s -> Either s a|
+version we can write:
 \begin{code}
-matching p s ≡ Left t ⇒ matching p t ≡ Left t'
+matching' p s ≡ Left s' ⇒ s ≡ s'
 \end{code}
-i.e. if a prism doesn't match, it shouldn't match second time either.
+The law is silly, as it completely defines the left part of the |Either|,
+therefore we can have |Maybe| in |preview| without any loss.
 
-we can state it using |preview| too, in a bit indirect way
-(this law is hard to property test):
-
-\begin{code}
-preview p s = None ⇒ (∀ a, review p a ≢ s)
-\end{code}
-i.e. if prism doesn't match (cannot |preview|) a |s| value,
-it cannot be created (|review|ed) with this prism.
-
-For example, take the type |T|:
+For example take a bogus |_Right| |Prism| variant:
 
 \begin{code}
-data T a = T1 a | T2 Int | T3 Int deriving (Eq, Show)
-
-instance Arbitrary a => Arbitrary (T a) where
-    arbitrary = oneof
-        [ T1 <$> arbitrary
-        , T2 <$> arbitrary
-        , T3 <$> arbitrary
-        ]
-\end{code}
-
-We can define wrong-looking |Prism| |_T1|
-
-\begin{code}
-_T1 :: Prism (T a) (T b) a b
-_T1 = prism T1 $ \t ->  case t of
-    T1 x -> Right x
-    T2 i -> Left (T3 i)
-    T3 i -> Left (T2 i)
+_Right' :: Prism' (Either Int a) a
+_Right' = prism Right $ \t ->  case t of 
+    Right x -> Right x
+    Left i  -> Left (Left (i + 1))
 \end{code}
 
 which will pass the \texttt{QuickCheck} tests:
 
 \begin{code}
 matchBuild_prop :: Int -> Property
-matchBuild_prop x = preview _T1 (review _T1 x) === Just x
+matchBuild_prop x = preview _Right' (review _Right' x) === Just x
 
 buildMatch_prop :: T Int -> Property
-buildMatch_prop s = case preview _T1 s of
-    Just a  -> label "just" $ review _T1 a === s
+buildMatch_prop s = case preview _Right' s of
+    Just a  -> label "just" $ review _Right' a === s
     Nothing -> label "nothing" True
 \end{code}
 
 but behave weirdly
 
 \begin{code}
-λ> matching _T1 (T1 'a')
+λ> matching _Right' (Right 'a')
 Right 'a'
-λ> matching _T1 (T2 42)
-Left (T3 42)
-λ> matching _T1 (T3 42)
-Left (T2 42)
+λ> matching _Right' (Left 42)
+Left (Left 43)
 \end{code}
 
 or
 
 \begin{code}
-λ> over _T1 id (T2 42)
-T3 42
+λ> over _Right' id (Left 1)
+Left 2
 \end{code}
-
 
 However, the \textbf{MatchMatch} property is clearly violated:
 
 \begin{code}
 matchMatch_prop :: T Int -> Property
-matchMatch_prop s = case matching _T1 s of
+matchMatch_prop s = case matching _Right' s of
     Right _ -> label "right" True
-    Left  t -> label "left" $ case matching _T1 t of
-        Right _  -> counterexample (show (t :: T Char)) False
-        Left  t' -> t === t'
+    Left  t -> label "left" $ t === s
 \end{code}
 
 as \texttt{QuickCheck} points out:
 
 \begin{code}
 λ> quickCheck matchMatch_prop
-*** Failed! Falsifiable (after 2 tests):
-T2 1
-T3 1 /= T2 1
+*** Failed! Falsifiable (after 1 test):  
+Left 0
+Left 1 /= Left 0
 \end{code}
 
 Our verification process didn't needed this law, as we used |preview| and |review|
-as core |Prism| primitives.
+as core |Prism| primitives. 
 There are two ways to construct |Prism| in the \texttt{prism} library:
 
 \begin{code}
@@ -649,10 +624,43 @@ prism  :: (b -> t) -> (s -> Either t a) -> Prism s t a b
 prism' :: (b -> s) -> (s -> Maybe    a) -> Prism s s a b
 \end{code}
 
-we use the latter |prism'| way. As you see it can construct only semi-monomorphic
-|Prism|. I think it's type should be restricted to return |Prism s s a a|.
-And we need to check the \textbf{MatchMatch} law for |Prism|s constructed with
-|prism|.
+we use the latter |prism'| way. As you see it can construct only semi-monomorphic |Prism|.
+I think it's type should be restricted to return |Prism s s a a|.
+And we need to check the \textbf{MatchMatch} law for |Prism|s constructed with |prism|.
+If we used (even the monomorphic version of) |matching| in the completeness proof,
+we would see the need for the law, if we actually use the left component of the result.
+
+The \textbf{MatchMatch} law as stated doesn't generalize to the
+polymorphic variant, as we require |s ~ t|, to be able to compare them.
+
+My original idea of the law doesn't work, neither another way to state it:
+
+\begin{code}
+-- too weak
+matching p s ≡ Left t ⇒ matching p t ≡ Left t'
+matching p s `leftBind` matching p' ≡ matching p s
+\end{code}
+
+A counterexample is when all of negative matches are the same:
+
+\begin{code}
+_Right'' :: Prism' (Either Int a) a
+_Right'' = prism Right $ \t ->  case t of 
+    Right x -> Right x
+    Left i  -> Left (Left 0)
+\end{code}
+
+However one polymorphic variant of \textbf{MatchMatch} law:
+
+\begin{code}
+matching p s ≡ Left t ⇒ matching p t ≡ Left s
+\end{code}
+
+seems to catch all invalid examples I can come with.
+It's not directly enough for \emph{Coq} (maybe it is).
+The relaxation of strict equality to |matching p t ≡ Left s| is sensible,
+as intuitively there should be a way to convert |t| back to |s|,
+|t| (as well as positive match results) fully determine the original |s|.
 
 \subsection{Affine}
 
