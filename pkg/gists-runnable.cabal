@@ -23,6 +23,7 @@ library
     Squash,
     ColorsInLhs2TeX
   exposed-modules:
+    ReviewN
     Achromatic
     TypeclassOptics
     SingleFree
@@ -67,6 +68,8 @@ library
     profunctors,
     semigroupoids,
     servant,
+    Only,
+    OneTuple,
     servant-server,
     splitmix,
     tagged,
