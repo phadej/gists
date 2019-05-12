@@ -174,6 +174,7 @@ readerOpts = PO.def
         & PO.enableExtension PO.Ext_fenced_code_attributes
         & PO.enableExtension PO.Ext_tex_math_dollars
         & PO.enableExtension PO.Ext_literate_haskell
+        & PO.enableExtension PO.Ext_footnotes
     }
 
 pandocTransform :: Pandoc -> Pandoc
