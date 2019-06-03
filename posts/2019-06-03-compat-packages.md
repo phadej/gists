@@ -101,29 +101,26 @@ complete) support than `base-compat`.
 
 The most is understood by looking at `build-depends` definitions of `base-compat-batteries`:
 
-```
-build-depends:
-    base        >= 4.3 && < 5,
-    base-compat == 0.10.5
+```text
 if !impl(ghc >= 7.8)
   build-depends:
-    tagged >= 0.8.5 && < 0.9
+    tagged               >= 0.8.5   && < 0.9
 if !impl(ghc >= 7.10)
   build-depends:
-    nats >= 1.1.2 && < 1.2,
-    void >= 0.7.2 && < 0.8
+    nats                 >= 1.1.2   && < 1.2,
+    void                 >= 0.7.2   && < 0.8
 if !impl(ghc >= 8.0)
   build-depends:
-    fail                >= 4.9.0.0 && < 4.10,
-    semigroups          >= 0.18.4  && < 0.20,
-    transformers        >= 0.2     && < 0.6,
-    transformers-compat >= 0.6     && < 0.7
+    fail                 >= 4.9.0.0 && < 4.10,
+    semigroups           >= 0.18.4  && < 0.20,
+    transformers         >= 0.2     && < 0.6,
+    transformers-compat  >= 0.6     && < 0.7
 if !impl(ghc >= 8.2)
   build-depends:
-    bifunctors >= 5.5.2 && < 5.6
+    bifunctors           >= 5.5.2   && < 5.6
 if !impl(ghc >= 8.6)
   build-depends:
-    contravariant >= 1.5 && < 1.6
+    contravariant        >= 1.5     && < 1.6
 ```
 
 In some cases (like application development), `base-compat-batteries` is a good
