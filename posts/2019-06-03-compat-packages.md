@@ -101,7 +101,7 @@ complete) support than `base-compat`.
 
 The most is understood by looking at `build-depends` definitions of `base-compat-batteries`:
 
-```text
+```cabal
 if !impl(ghc >= 7.8)
   build-depends:
     tagged               >= 0.8.5   && < 0.9
@@ -374,7 +374,7 @@ bytestring
 [`bytestring`](https://hackage.haskell.org/package/bytestring) provides
 an immutable byte string type (pinned memory).
 
-<h3>bytesring-builder</h3>
+<h3>bytestring-builder</h3>
 
 [`bytestring-builder`](https://hackage.haskell.org/package/bytestring-builder)
 provides `Data.ByteString.Builder` and `Data.ByteString.Short` modules
@@ -478,8 +478,8 @@ data V2 a = V2 a a
 
 instance Applicative V2 where ...
 
-deriveVia [t| forall a. Semigroup a => Semigroup (V2 a) `Via` (Ap MyType a) |]
-deriveVia [t| forall a. Monoid    a => Monoid    (V2 a) `Via` (Ap MyType a) |]
+deriveVia [t| forall a. Semigroup a => Semigroup (V2 a) `Via` (Ap V2 a) |]
+deriveVia [t| forall a. Monoid    a => Monoid    (V2 a) `Via` (Ap V2 a) |]
 ```
 
 It feels like `StandaloneDeriving` with all pros and cons of it.

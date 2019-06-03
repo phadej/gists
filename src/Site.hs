@@ -10,6 +10,7 @@ import Control.Monad.State.Strict (State, runState)
 import Data.List (isPrefixOf)
 import Text.Pandoc (Pandoc, Block (..))
 import Text.Pandoc.Walk (walk)
+import Skylighting (Syntax, parseSyntaxDefinition)
 
 import Hakyll
 
@@ -44,7 +45,9 @@ main :: IO ()
 main = LaTeX.initFormulaCompilerDataURI 1000 LaTeX.defaultEnv >>= main'
 
 main' :: (LaTeX.PandocFormulaOptions -> Pandoc -> Compiler Pandoc) -> IO ()
-main' renderFormulae = hakyll $ do
+main' renderFormulae = do
+  cabalSyntax <- parseSyntaxDefinition "syntax/cabal.xml" >>= either fail pure
+  hakyll $ do
     match "images/*" $ do
         route   idRoute
         compile copyFileCompiler
@@ -80,7 +83,7 @@ main' renderFormulae = hakyll $ do
     match postsPattern $ do
         route $ setExtension "html"
         let compiler
-                = pandocCompilerWithTransformM readerOpts writerOpts
+                = pandocCompilerWithTransformM readerOpts (writerOpts cabalSyntax)
                 $ renderFormulae pandocFormulaOptions
                 . pandocTransform
         compile $ compiler
@@ -161,9 +164,10 @@ pandocFormulaOptions = def
 -- Pandoc
 -------------------------------------------------------------------------------
 
-writerOpts :: PO.WriterOptions
-writerOpts = PO.def
+writerOpts :: Syntax ->  PO.WriterOptions
+writerOpts cabalSyntax = PO.def
     { PO.writerHighlightStyle = Just PH.pygments -- kate
+    , PO.writerSyntaxMap      = Map.insert "cabal" cabalSyntax $ PO.writerSyntaxMap PO.def
     -- , PO.writerHtml5 = True
     }
 

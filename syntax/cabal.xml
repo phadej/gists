@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE language SYSTEM "language.dtd">
+<language name="cabal" version="5" kateversion="5.0" section="Markup"
+          extensions="*.cabal" mimetype="text/x-cabal"
+          author="Oleg Grenrus" license="GPL-2.0-or-later">
+  <highlighting>
+    <contexts>
+      <context attribute="Normal Text" lineEndContext="#stay" name="normal" >
+        <Detect2Chars attribute="Comment" context="comment" char="-" char1="-" firstNonSpace="true" />
+        <DetectSpaces/>
+
+		<!-- conditionals -->
+		<WordDetect attribute="Stanza" context="cond" String="if" insensitive="true"/>
+
+		<!-- field names -->
+		<DetectChar attribute="FieldName" char=":" />
+		<WordDetect attribute="FieldName" String="build-depends" insensitive="true" />
+
+		<!-- version ranges -->
+		<RegExpr attribute="VersionRange" String="(>=|&lt;)\s+\d+(\.\d+)*" />
+
+		<StringDetect attribute="Operator" String="&amp;&amp;" />
+
+		<!-- package names -->
+		<RegExpr attribute="Normal Text" String="[a-zA-Z0-9-]+" firstNonSpace="true" />
+      </context>
+
+      <context attribute="Normal Text" lineEndContext="#pop" name="cond">
+        <DetectSpaces/>
+		<DetectChar attribute="Operator" char="!" />
+		<StringDetect attribute="FieldName" String="impl" context="condp" />
+      </context>
+
+	  <context attribute="Normal Text" lineEndContext="#pop#pop" name="condp">
+        <DetectSpaces/>
+		<DetectChar attribute="Operator" char="(" />
+		<DetectChar attribute="Operator" char=")" context="#pop" />
+		<StringDetect attribute="Variable" String="ghc" />
+		<RegExpr attribute="VersionRange" String=">=\s+\d+(\.\d+)*" />
+	  </context>
+
+      <context attribute="Comment" lineEndContext="#pop" name="comment">
+      </context>
+
+    </contexts>
+
+    <itemDatas>
+      <itemData name="Normal Text" defStyleNum="dsNormal" />
+      <itemData name="Comment" defStyleNum="dsComment" />
+      <itemData name="Operator" defStyleNum="dsOthers" />
+
+	  <itemData name="FieldName" defStyleNum="dsDataType" />
+	  <itemData name="Stanza" defStyleNum="dsKeyword" />
+	  <itemData name="Variable" defStyleNum="dsString" />
+	  <itemData name="VersionRange" defStyleNum="dsDecVal" />
+
+      <itemData name="Error" defStyleNum="dsError" />
+    </itemDatas>
+  </highlighting>
+
+  <general>
+    <folding indentationsensitive="1" />
+    <comments>
+      <comment name="singleLine" start="--" position="afterwhitespace" />
+    </comments>
+    <keywords casesensitive="1"/>
+  </general>
+</language>
