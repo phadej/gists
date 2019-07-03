@@ -6,7 +6,7 @@ tags: linear
 
 It's common knowledge that we can encode ADTs using so called
 [Church-encoding](https://en.wikipedia.org/wiki/Church_encoding).
-It's more correctly called Böhm-Berarducci encoding, as 
+It's more correctly called Böhm-Berarducci encoding, as
 they showed how to *systematically* make a translation in a typed setting in 1985.[^okmij]
 
 [^okmij]: See [Beyond Church encoding: Boehm-Berarducci isomorphism of algebraic data types and polymorphic lambda-terms](http://okmij.org/ftp/tagless-final/course/Boehm-Berarducci.html)
@@ -204,7 +204,7 @@ We can derive another rule:
  Δ ; a : A; f : A ⊸ B ⊢ let b = f a in c : C
 ```
 
-which follows by taking `Γ = a : A`, and discharging the 
+which follows by taking `Γ = a : A`, and discharging the
 `Γ ⊢ a : A` using `ID`-rule. The `⊸L'` rule cannot be taken as a definition,
 as using it would often require `CUT` (which we avoid).
 
@@ -223,7 +223,7 @@ we need to be able to construct it for any variable name (i.e. `X` is not used i
 ```
  Γ ⊢ b : B [Y/X]
 --------------------- ∀R
- Γ ⊢ Λ X -> b : ∀X.B	
+ Γ ⊢ Λ X -> b : ∀X.B
 ```
 
 Left rule is almost exact copy of ⊸L, except we can make up new type expressions
@@ -284,9 +284,9 @@ The reverse, ⇐ direction is quite direct too
 --------------- ⊗R
  A ; B ⊢ A ⊗ B
 ------------------- ⊸R²    --------------- ID
- ⊢ (A ⊸ B ⊸ A ⊗ B)          A ⊗ B ⊢ A ⊗ B 
+ ⊢ (A ⊸ B ⊸ A ⊗ B)          A ⊗ B ⊢ A ⊗ B
 ------------------------------------------ ⊸L
- (A ⊸ B ⊸ A ⊗ B) ⊸ A ⊗ B ⊢ A ⊗ B 
+ (A ⊸ B ⊸ A ⊗ B) ⊸ A ⊗ B ⊢ A ⊗ B
 --------------------------------- ∀L
  ∀R. (A ⊸ B ⊸ R) ⊸ R ⊢ A ⊗ B
 ```
@@ -320,7 +320,7 @@ I'd say, there shouldn't be anything surprising in the rules
 ```
 
 ```
- Γ ; a : A ⊢ c₁ : C    Γ ; b : B ⊢ c₂ : C   
+ Γ ; a : A ⊢ c₁ : C    Γ ; b : B ⊢ c₂ : C
 --------------------------------------------------------------- ⊕L
  Γ ; ab : A ⊕ B ⊢ case ab of { InL a -> c₁ ; InR b -> c₂ } : C
 ```
@@ -328,7 +328,7 @@ I'd say, there shouldn't be anything surprising in the rules
 At this point, one could think that we could do
 
 ```
-A ⊕ B ≢ ∀R. (A ⊸ R) ⊸ (B ⊸ R) ⊸ R 
+A ⊕ B ≢ ∀R. (A ⊸ R) ⊸ (B ⊸ R) ⊸ R
 ```
 
 analogously to `either`. But that doesn't work: Try!
@@ -370,7 +370,7 @@ Encoding of plus
 Using *with* we can BB-encode *plus*.
 
 ```
-A ⊕ B ≡ ∀R. ((A ⊸ R) & (B ⊸ R)) ⊸ R 
+A ⊕ B ≡ ∀R. ((A ⊸ R) & (B ⊸ R)) ⊸ R
 ```
 
 That's using
@@ -388,7 +388,7 @@ lhs : A ⊕ B
     ⊢ Λ R -> λ f -> case lhs of
       InL a -> fst f a
       InR b -> snd f b
-    : ∀R. ((A ⊸ R) & (B ⊸ R)) ⊸ R 
+    : ∀R. ((A ⊸ R) & (B ⊸ R)) ⊸ R
 ```
 
 Depending on a `lhs` branch we pick proper half of with argument.
@@ -407,7 +407,7 @@ Encoding of with
 So let's try to write a BB-encoding for A & B. Reasonable guess is
 
 ```
-A & B ≢ ∀R. ((A ⊸ R) ⊕ (B ⊸ R)) ⊸ R 
+A & B ≢ ∀R. ((A ⊸ R) ⊕ (B ⊸ R)) ⊸ R
 ```
 
 The ⇒ direction works out:
@@ -483,7 +483,7 @@ t has expected rules:
 
 ```
 ----------- 1R
- ⊢ One : 1 
+ ⊢ One : 1
 ```
 
 ```
@@ -581,7 +581,7 @@ Appendix: All rules in one place
 ```
  Γ ⊢ b : B [Y/X]
 --------------------- ∀R
- Γ ⊢ Λ X -> b : ∀X.B	
+ Γ ⊢ Λ X -> b : ∀X.B
 ```
 
 ```
@@ -601,7 +601,7 @@ Appendix: All rules in one place
 ```
 
 ```
- Γ ; a : A ⊢ c₁ : C    Γ ; b : B ⊢ c₂ : C   
+ Γ ; a : A ⊢ c₁ : C    Γ ; b : B ⊢ c₂ : C
 --------------------------------------------------------------- ⊕L
  Γ ; ab : A ⊕ B ⊢ case ab of { InL a -> c₁ ; InR b -> c₂ } : C
 ```
@@ -624,7 +624,7 @@ Appendix: All rules in one place
 
 ```
 ----------- 1R
- ⊢ One : 1 
+ ⊢ One : 1
 ```
 
 ```
