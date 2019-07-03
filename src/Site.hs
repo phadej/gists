@@ -42,7 +42,7 @@ feedConfiguration = FeedConfiguration
 -------------------------------------------------------------------------------
 
 main :: IO ()
-main = LaTeX.initFormulaCompilerDataURI 1000 LaTeX.defaultEnv >>= main'
+main = LaTeX.initFormulaCompilerDataURI 1000 environmentOptions >>= main'
 
 main' :: (LaTeX.PandocFormulaOptions -> Pandoc -> Compiler Pandoc) -> IO ()
 main' renderFormulae = do
@@ -140,24 +140,35 @@ postsPattern = fromRegex "^posts/.*\\.(md|lhs|tex)$"
 -- Latex
 -------------------------------------------------------------------------------
 
+environmentOptions :: LaTeX.EnvironmentOptions
+environmentOptions = LaTeX.defaultEnv
+    { LaTeX.imageMagickArgs = [] -- ["-unsharp", "0.5x0.5+0.5"]
+    }
+
 pandocFormulaOptions :: LaTeX.PandocFormulaOptions
 pandocFormulaOptions = def
     { LaTeX.formulaOptions = fopts
+    , LaTeX.shrinkBy       = 2
     }
   where
     def = LaTeX.defaultPandocFormulaOptions
     fopts mt = (LaTeX.formulaOptions def mt)
         { LaTeX.preamble = concat
-            [ "\\usepackage{amsmath}"
+            [ "\\usepackage[T1]{fontenc}"
+            , "\\usepackage{amsmath}"
             , "\\usepackage{amssymb}"
             , "\\usepackage{amsthm}"
             , "\\usepackage{amsfonts}"
             , "\\usepackage{stmaryrd}"
             , "\\usepackage{mathpazo}"
             , "\\usepackage{mathtools}"
+            , "\\usepackage{prftree}"
             -- proofs (find-right-laws)
             , "\\newcommand{\\equivvia}[1]{\\equiv\\!\\!\\langle\\ #1\\ \\rangle}"
+            -- with leftovers
+            , "\\newcommand{\\RightarrowLabel}[1]{\\xRightarrow{\\displaystyle\\;#1\\;\\;}}"
             ]
+        , LaTeX.dpi = 200
         }
 
 -------------------------------------------------------------------------------
