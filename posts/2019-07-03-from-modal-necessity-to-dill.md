@@ -47,16 +47,19 @@ We'll write contexts as `Γ, a : A ; Δ , b : B` separating context parts by
 semicolon, and individual assumptions (or parts) by comma. For empty
 part we'll write `∙`.
 
-Next we need to adapt the rules for the linear setting.
+Next we need to adapt the Pfenning and Davies rules for the linear setting.
+Their system is not linear, so we need to make some adjustments.
+We'll go through the rules one-by-one.
 
-**Hypothesis / variable / axiom.** We change the `ID` rule (from [my last post](2019-06-26-linear-church-encodings.html)) to allow any intuitionistic
-context. Here `Δ = a : A`
+**Hypothesis / variable / axiom.** We change the `ID` rule (from [my last post, desribing Multiplicative-Additive Intuitionistic Linear Logic](2019-06-26-linear-church-encodings.html)) to allow any intuitionistic
+context. Original `ID` rule is `a : A ⊢ a : A`; we additionally allow an arbitrary intuitionistic context Γ (remember: it can be formed from nothing at all).
 
 ```
 ------------------ Lin-ID
  Γ; a : A ⊢ a : A
 ```
 
+We'll also need a rule to use variable from an intuionistic context.
 Using an assumption from intuitionistic context doesn't "consume" anything.
 Note that linear part is required to be empty, `Δ = ∙`
 
@@ -86,6 +89,9 @@ These rules feels weird. We can show that rules are locally *sound* and *complet
 Local soundness describes a single step of admissibility of cut, kind of β-reduction step.
 Local completeness describes a way to η-expand. These are simple checks,
 so we know that right and left rules are well-balanced: not too powerful nor weak.
+To be fair, I have only seen local soundness and completeness checks done
+for natural deduction calculi, but I think it makes sense for sequent calculi
+as well; though we need to invoke `CUT` for local soundness.
 
 **Local soundness**
 The way right and left rules are set up, a proof term with right rule on the
@@ -206,7 +212,7 @@ There are recent developments in linear logic
 which instead of having two contexts, use a single
 context but have an annotation on each assumption.
 For example, look at the *GrMini* from Granule paper, and syntax in Atkey & Wood extended abstract:
-they are quite the same, but differnt from what we just seen.
+they are quite the same, but different from what we just seen.
 The difference is well illustrated by ⊗R-rule: (our) two context approach rule is
 
 ```haskell
@@ -228,6 +234,9 @@ and split the usages, not the context:
 Generalising what you use as annotations, you can get
 Pfenning and Davies’ modal type theory
 or Barber's DILL, as Atkey and Wood show in their abstract.
+
+To find out how Granule and Atkey & Wood systems differ, it's probably
+easies to find them on the internet or at conference and discuss directly :)
 
 In hindsight, using annotations/multiplicities/... is an "obvious" discovery.
 If you try to formalise linear logic fragment in Coq or Agda, *removing* things
