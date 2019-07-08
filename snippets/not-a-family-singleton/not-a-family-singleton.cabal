@@ -1,0 +1,23 @@
+cabal-version: 2.4
+name:          not-a-family-singleton
+version:       0
+
+library
+  default-language: Haskell2010
+  ghc-options:      -Wall -Wno-orphans
+  exposed-modules:
+    Take1
+    Take2
+    Take3
+    Take3b
+    Sing1
+    Sing1i
+    Sing1ii
+    Either
+
+  build-depends:
+    , base    >=4.10    && <4.12
+    , fin     ^>=0.0.3
+    , tagged  ^>=0.8.6
+    , text    ^>=1.2.3.0
+    , vec     ^>=0.1.1

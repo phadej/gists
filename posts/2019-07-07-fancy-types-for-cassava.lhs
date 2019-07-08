@@ -39,10 +39,11 @@ or [older version from NYC Haskell Group meetup](https://www.youtube.com/watch?v
 ```haskell
 {- cabal:
 build-depends:
-  , base ^>=4.10 || ^>=4.11
-  , fin  ^>=0.0.3
-  , vec  ^>=0.1.1
-  , text ^>=1.2.3.0
+  , base   ^>=4.10 || ^>=4.11
+  , fin    ^>=0.0.3
+  , vec    ^>=0.1.1
+  , tagged ^>=0.8.6
+  , text   ^>=1.2.3.0
 
 ghc-options:        -Wall -pgmL markdown-unlit
 build-tool-depends: markdown-unlit:markdown-unlit ^>=0.5.0
@@ -63,7 +64,7 @@ Next a `{-# LANGUAGE Dependent #-}` collection of extensions...
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_GHC -Wall -Wno-partial-type-signatures #-}
+{-# OPTIONS_GHC -Wall -Wno-partial-type-signatures -Wno-unused-imports #-}
 ```
 
 ... and imports
@@ -82,10 +83,10 @@ import Data.Vec.Lazy (Vec (..))
 import GHC.Generics
 import Text.Read (readMaybe)
 
-import qualified Data.Type.Nat as N
+import qualified Data.Fin as F
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import qualified Data.Fin as F
+import qualified Data.Type.Nat as N
 import qualified Data.Vec.Lazy as V
 ```
 
