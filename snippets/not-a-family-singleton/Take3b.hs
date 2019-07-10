@@ -3,7 +3,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -16,7 +17,9 @@ module Take3b where
 
 import Data.Kind (Type, Constraint)
 import Data.Proxy
+import Data.Type.Nat (SNat (..), SNatI (..))
 import qualified Data.Type.Nat as N
+import Data.Type.Equality
 
 import Sing1ii
 
@@ -78,3 +81,37 @@ instance (c x, Induction c xs) => Induction c (x ': xs) where
 
 slist' :: forall c xs. Induction c xs => SList c xs
 slist' = ind (Proxy :: Proxy c) SNil (\_ -> SCons)
+
+-------------------------------------------------------------------------------
+-- 
+-------------------------------------------------------------------------------
+
+class SEq (c :: k -> Constraint) (s :: k -> Type) | c -> s , s ->  c where
+    sequality :: s a -> s b -> Maybe (a :~: b)
+
+    sequalityI :: (c a, c b) => Proxy c -> Maybe (a :~: b)
+
+instance SEq SNatI SNat where
+    sequality SZ SZ = Just Refl
+    sequality SS SZ = Nothing
+    sequality SZ SS = Nothing
+    sequality SS SS = N.eqNat
+
+    sequalityI _ = N.eqNat
+
+instance SEq c s => SEq (SListI c) (SList c) where
+    sequality SNil  SNil  = Just Refl
+    sequality SCons SNil  = Nothing
+    sequality SNil  SCons = Nothing
+    sequality SCons SCons = res where
+        res :: forall x xs y ys. (c x, SListI c xs, c y, SListI c ys)
+            => Maybe ((x ': xs) :~: (y ': ys))
+        res = do
+            Refl <- sequalityI (Proxy :: Proxy c)          :: Maybe (x :~: y)
+            Refl <- sequalityI (Proxy :: Proxy (SListI c)) :: Maybe (xs :~:  ys)
+            Just Refl
+
+    sequalityI
+        :: forall xs ys. (SListI c xs, SListI c ys)
+        => Proxy (SListI c) -> Maybe (xs :~: ys)
+    sequalityI _ = sequality (slist :: SList c xs) (slist :: SList c ys)
