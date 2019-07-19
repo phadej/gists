@@ -8,7 +8,7 @@ tags: servant
 or simply put: <i>a practical introduction to <code>Servant.Client.Free</code></i>.
 </blockquote>
 
-We (Alp MEsganogullari and myself) wrote a new cookbook recipe for Servant,
+We (Alp Mesganogullari and myself) wrote a new cookbook recipe for Servant,
 it's a part of [the official servant's cookbook at readthedocs](https://haskell-servant.readthedocs.io/en/latest/cookbook/using-free-client/UsingFreeClient.html).
 
 ---
