@@ -1,0 +1,22 @@
+digraph G {
+rankdir=BT;
+node [shape=box];
+
+{rank = same; 0; F;}
+{rank = same; 1; T;}
+
+"F" -> "T" [style=dashed, label ="FT"];
+
+"0" [label="0 = f F"];
+"1" [label="1 = f T"];
+
+"T" -> "1" [label="f T"];
+"F" -> "0" [label="f F"];
+
+"0" -> "a" [style=dotted]
+"0" -> "b" [style=dotted];
+"a" -> "1" [style=dotted];
+"b" -> "1" [style=dotted];
+"0" -> "1" [style=dotted; label="f FT"];
+}
+

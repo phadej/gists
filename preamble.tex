@@ -36,8 +36,10 @@
 
 % Colors
 \usepackage{xcolor}
-\definecolor{darkgreen}{rgb}{0,.5,0}
+\definecolor{darkgreen}{rgb}{0,.4,0}
 \definecolor{darkblue}{rgb}{0,0,.5}
+\definecolor{darkred}{rgb}{0.5,0,0}
+\definecolor{darkviolet}{rgb}{0.4,0,0.4}
 
 % Fonts
 \usepackage{mathpazo}
@@ -59,7 +61,7 @@
 % bibliography
 \usepackage[square,sort&compress,numbers]{natbib}
 \bibliographystyle{acm}
-\renewcommand*{\bibfont}{\footnotesize}
+% \renewcommand*{\bibfont}{\footnotesize}
 
 % lhs2TeX
 % \usepackage{poly}
@@ -118,10 +120,10 @@
 % http://en.wikibooks.org/wiki/LaTeX/Theorems
 
 % http://tex.stackexchange.com/questions/46258/how-to-get-correct-autoref-for-theorems
-%\theoremstyle{definition}
-%\newtheorem{definition}{Definition}[chapter]
-%\newtheorem{example}[definition]{Example}
-%\newtheorem{remark}[definition]{Remark}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{example}[definition]{Example}
+\newtheorem{remark}[definition]{Remark}
 
 %\newcommand{\definitionautorefname}{Definition}
 %\newcommand{\exampleautorefname}{Definition}

@@ -1,0 +1,382 @@
+\documentclass{article}
+%include polycode.fmt
+
+\begin{document}
+
+Not so long ago, an older post of mine about \href{2018-07-12-llc-in-agda.html}{LLC in Agda} circulated on Twitter.
+One comment was: \emph{it's typing with leftovers!} What does that mean? you may ask; let me show.
+
+This is the post with fancy \LaTeX\ formulas :)
+
+\subsection{An example with times}
+
+In \href{2019-06-26-linear-church-encodings.html}{Church encoding of linear types} post,
+we wrote a right rule for times as (slightly adjusted)
+
+
+\begin{code}
+ Γ ==> x : X    Γ ==> y : Y
+---------------------------- ⊗R
+ Γ₁,Γ₂ ==> pair x y : X ⊗ Y
+\end{code}
+
+And the fancy \LaTeX\ version of it looks like:
+
+\begin{equation*}
+\prfinterspace=2em
+\prftree[r]{${\otimes}\text{R}$}{
+\Gamma_1 \Longrightarrow x:X
+}{
+\Gamma_2 \Longrightarrow y:Y
+}{
+\Gamma_1,\Gamma_2 \Longrightarrow \mathtt{pair}\;x\;y : X \otimes Y
+}
+\end{equation*}
+
+In this version, we somehow know how to split the context into two parts,
+to construct halves of times-pair.
+
+Another way to formulate rules, is using leftover contexts:
+
+\begin{equation*}
+\prfinterspace=2em
+\prftree[r]{${\otimes}\text{R}$}{
+\Gamma_1 \xRightarrow{\displaystyle\;x:X\;\;} \Gamma_2
+}{
+\Gamma_2 \xRightarrow{\displaystyle\;y:Y\;\;} \Gamma_3
+}{
+\Gamma_1 \xRightarrow{\displaystyle\;\mathtt{pair}\;x\;y : X \otimes Y\;\;} \Gamma_3
+}
+\end{equation*}
+
+We start with $\Gamma_1$ context, try to construct $x:X$. Its construction
+uses as much stuff from context as it needs, leaving over some context $\Gamma_2$.
+Then we continue with $\Gamma_2$ context trying to construct $y:Y$, and get
+another residual context $\Gamma_3$. So starting with $\Gamma_1$ context,
+we can construct a pair $X \otimes Y$, with a leftover $\Gamma_3$.
+
+\subsection{A few more rules}
+
+We'll need few more rules to make large enough fragment of logic to show
+meaningful example: Identity rule, left rule for times an
+right and left rules for linear implication and one.
+This fragment is called \emph{Multiplicative Intuitionistic Linear Logic},
+or MILL for short.
+
+\begin{equation*}
+\prfbyaxiom{\sc Id}
+{
+\Gamma, x : X \xRightarrow{\displaystyle\; x : X\;\;} \Gamma
+}
+\end{equation*}
+
+\begin{equation*}
+\frac{
+\Gamma_1, x : X, y : Y \xRightarrow{\displaystyle\;z : Z\;\;} \Gamma_2
+}{
+\Gamma_1, p : X \otimes Y \xRightarrow{\displaystyle\mathtt{case}\;p\;\mathtt{of}\;\mathtt{pair}\;x\;y \mathrel{\mapsto} z : Z\;\;} \Gamma_2
+}\,{\otimes}\text{L}
+\end{equation*}
+
+\begin{equation*}
+\frac {
+\Gamma_1, x : X \xRightarrow{\displaystyle\;y:Y\;\;} \Gamma_2
+}{
+\Gamma_1 \xRightarrow{\displaystyle\;\lambda\,x \mapsto y : X \multimap Y} \Gamma_2
+}\,{\multimap}\text{R}
+\qquad\qquad
+\frac{
+\Gamma_1 \xRightarrow{\displaystyle\;x : X\;\;} \Gamma_2
+\qquad
+\Gamma_2, f\,x : Y \xRightarrow{\displaystyle\; z : Z \;\;}\Gamma_3
+}{
+\Gamma_1, f : X \multimap Y \xRightarrow{\displaystyle\; z : Z\;\;} \Gamma_3
+}\,{\multimap}\text{L}
+\end{equation*}
+
+\begin{equation*}
+\prftree[r]{$1\text{R}$}
+{\
+}
+{
+\Gamma \RightarrowLabel{\mathtt{one} : 1} \Gamma
+}
+\qquad\qquad
+\prftree[r]{$1\text{L}$}
+{
+\Gamma_1 \RightarrowLabel{z : Z} \Gamma_2
+}
+{
+\Gamma_1, x : 1 \RightarrowLabel{z : Z} \Gamma_2
+}
+\end{equation*}
+
+\subsection{Linear curry}
+
+Let us see how this work in practice. Let's write
+$\mathtt{curry} : ((X \otimes Y) \multimap Z) \multimap X \multimap Y \multimap Z$.
+
+First we'll write in "a traditional style". I'll omit proof terms for brevity.
+
+\begin{equation*}
+\prfinterspace=2em
+\prftree[r]{${\multimap}\text{R}^3$}{
+  \prftree[r]{${\multimap}\text{L}$}{
+    \prftree[r]{${\otimes}R$}{
+      \prfbyaxiom{\sc Id}{X \Longrightarrow X}
+    }{
+      \prfbyaxiom{\sc Id}{Y \Longrightarrow Y}
+    }{
+      X,Y \Longrightarrow X \otimes Y
+    }
+  }{
+    \prfbyaxiom{\sc Id}{Z \Longrightarrow Z}
+  }{
+  X \otimes Y \multimap Z, X, Y  \Longrightarrow Z
+  }
+}{
+\bullet \Longrightarrow (X \otimes Y \multimap Z) \multimap X \multimap Y \multimap Z
+}
+\end{equation*}
+
+The proof term is
+
+\begin{code}
+curry = \f x y -> f (pair x y)
+\end{code}
+
+Let's see the with leftovers derivation tree.
+
+\begin{equation*}
+\prfinterspace=2em
+\prftree[r]{${\multimap}\text{R}^3$}{
+  \prftree[r]{${\multimap}\text{L}$}{
+    \prftree[r]{${\otimes}R$}{
+      X,Y \RightarrowLabel{X} Y
+    }{
+      Y \RightarrowLabel{Y} \bullet
+    }{
+      X,Y \RightarrowLabel{X \otimes Y} \bullet
+    }
+  }{
+    \prfbyaxiom{\sc Id}{Z \RightarrowLabel{Z} \bullet}
+  }{
+    X \otimes Y \multimap Z, X, Y \RightarrowLabel{Z} \bullet
+  }
+}{
+  \bullet \RightarrowLabel{ (X \otimes Y \multimap Z) \multimap X \multimap Y \multimap Z} \bullet
+}
+\end{equation*}
+
+Not so surpsingly, the proof term is the same
+
+\begin{code}
+curry = \f x y -> f (pair x y)
+\end{code}
+
+\subsection{What's the point?}
+
+The leftover approach seems more complicated, why to use it?
+There is at least two reasons. First is that proof search is a lot more direct.
+Let us examine the $\mathtt{curry}$ derivation more closely.
+
+This fragment of linear logic is so well behaving, that a "try whatever fits"
+strategy will find a solution. Let us however make it a bit more precise:
+
+\begin{enumerate}
+  \item Use {\sc Id}-rule if it applies.
+  \item Try right rules.
+  \item Try left rules.
+  \item Go to 1.
+\end{enumerate}
+
+Let's see how that strategy works on $\mathtt{curry}$. First we try right rules
+while they match. We arrive at \
+
+\begin{equation*}
+ X \otimes Y \multimap Z, X, Y \RightarrowLabel{Z} \bullet
+\end{equation*}
+
+situation. $Z$ is atomic formula, so no right rule match. {\sc Id} doesn't apply either.
+So we have to use some left rule. In this situation we don't have a choice,
+as only $\otimes$L applies. The goal state has two obligations, note how
+we don't yet know what $\Gamma_1$ will become.
+
+\begin{equation*}
+X,Y \RightarrowLabel{X \otimes Y} \Gamma_1 \qquad\qquad \Gamma_1,Z \RightarrowLabel{Z} \bullet
+\end{equation*}
+
+We continue with the leftmost derivation. $\otimes_R$ rule applies. Note,
+how rule output and input context form kind of a chain:
+
+\begin{equation*}
+X,Y \RightarrowLabel{X} \Gamma_2 \qquad\qquad \Gamma_2 \RightarrowLabel{Y} \Gamma_1 \qquad\qquad \Gamma_1,Z \RightarrowLabel{Z} \bullet
+\end{equation*}
+
+Now, {\sc Id}-rule applies, and we infer that $\Gamma_2 = Y$.
+
+\begin{equation*}
+Y \RightarrowLabel{Y} \Gamma_1 \qquad\qquad \Gamma_1,Z \RightarrowLabel{Z} \bullet
+\end{equation*}
+
+{\sc Id}-rule applies again, $\Gamma_1 = \bullet$
+
+\begin{equation*}
+Z \RightarrowLabel{Z} \bullet
+\end{equation*}
+
+and again. Finally we are left with no obligations and an empty context, as was required.
+Proof search completes successfully. Note how we didn't need to an arbitrary guess
+how to split the context. With "traditional" sequents, we'd need to guess how to split
+context when using $\multimap$L and $\otimes$R rules, for example in a situation like:
+
+\begin{equation*}
+\prfinterspace=2em
+\prftree[r]{${\otimes}\text{R}$}
+{\Gamma_1 \Longrightarrow X}
+{\Gamma_2 \Longrightarrow Y}
+{X, Y \Longrightarrow X \otimes Y}
+\end{equation*}
+
+What should $\Gamma_1$ and $\Gamma_2$ be? With leftovers approach,
+we just continue with full context, and see what's left.
+
+It's worth pointing out, that in ordinary lambda calculus, there are no such
+problem. If we would need to find a term for $\Gamma \vdash X \times Y$, we'd
+split the search into to sub-searches: $\Gamma \vdash X$ and $\Gamma \vdash Y$,
+as we can reuse assumptions as many times as needed.
+
+\subsubsection{DILL and annotations}
+
+In a \href{2019-07-04-from-modal-necessity-to-dill.html}{recent post} I described DILL.
+It works with leftover typing as well. For example a $\otimes$R-rule would look like:
+
+\begin{equation*}
+\prfinterspace=2em
+\prftree[r]{${\otimes}\text{R}$}
+{\Gamma; \Delta_1 \RightarrowLabel{x : X} \Delta_2}
+{\Gamma; \Delta_2 \RightarrowLabel{y : Y} \Delta_3}
+{\Gamma; \Delta_1 \RightarrowLabel{\mathtt{pair}\;x\;y : X \otimes Y} \Delta_3}
+\end{equation*}
+
+Yet, it's more interesting to use annotations. The assumptions
+stay always the same, but their usage changes:
+
+\begin{equation*}
+\prfinterspace=2em
+\prftree[r]{${\otimes}\text{R}$}
+{\Gamma; M_1 \RightarrowLabel{x : X} M_2}
+{\Gamma; M_2 \RightarrowLabel{y : Y} M_3}
+{\Gamma; M_1 \RightarrowLabel{\mathtt{pair}\;x\;y : X \otimes Y} M_3}
+\end{equation*}
+
+where, type type of $M_1$, $M_2$ and $M_3$ depend on $\Gamma$ (they are "lists" of the same length).
+Not a big change, but that's how \href{2018-07-12-llc-in-agda.html}{LLC in Agda}
+is encoded. And I think that encoding is quite simple.
+
+For example, in a following simple derivation the variables stay always the same: $\Gamma = x : X, y : Y$,
+only their multiplicities  change during the course.
+I'll write multiplicities reusing variable names, $M_1 = x^1, y^1; M_2 = x^0, y^1; M_3 = x^0, y^0$:
+
+\begin{equation*}
+\prfinterspace=2em
+\prftree[r]{${\otimes}\text{R}$}
+{x : X, y : Y; x^1, y^1 \RightarrowLabel{x : X} x^0, y^1}
+{x : X, y : Y; x^0, y^1 \RightarrowLabel{y : Y} x^0, y^0}
+{x : X, y : Y; x^1, y^1 \RightarrowLabel{\mathtt{pair}\;x\;y : X \otimes Y} x^0, y^0}
+\end{equation*}
+
+This approach is also how you could represent and type-check
+linear logic using \href{https://hackage.haskell.org/package/bound}{\texttt{bound}}-library.
+See an \href{https://github.com/phadej/write-yourself-a-typed-functional-language/blob/master/src/LLC.hs}{example} from my \href{https://skillsmatter.com/skillscasts/12389-write-yourself-a-typed-functional-language}{HaskellX 2018 talk}.
+
+And this approach is used in \href{2018-07-12-llc-in-agda.html}{LLC in Agda}: There $\Gamma : \texttt{Ctx}$
+and $M : \texttt{Ctx} \to \texttt{Set}$.
+
+Using terminology from \href{https://personal.cis.strath.ac.uk/conor.mcbride/PlentyO-CR.pdf}{\emph{I Got Plenty o’ Nuttin’} by Conor McBride}
+(definition 6):
+$\Gamma$ is a \emph{precontext}; $\Gamma; M$ is \Gamma-context (Conor uses \Delta).
+Conor's notation is $\Delta, \rho x : S$ is a $\textsc{Cx}(\Gamma;x:S)$,
+and I'd write $\Gamma, x : S; M, x^\rho$. My notation highlights in the leftover setting
+that usually \emph{precontext} stays the same, and multiplicities change when bindings are "used".
+
+So the implementation concerns are the second reason to use leftover typing.
+
+\subsection{We need to be careful}
+
+TBW
+
+\subsection{You don't expect this, but: regular expressions}
+
+Linear logic is a substructural logic, where so called structural rules
+of contraction (duplication) and weakening (removing) are removed.
+There's third structural rule: exchange (using out-of-order).
+
+\begin{itemize}
+  \item all rules: intuitionistic logic
+  \item without contraction: affine logic
+  \item without weakening: relevant logic
+  \item without contraction and weakening: linear logic
+  \item without contraction, weakening, and exchange: ordered logic
+\end{itemize}
+
+Ordered logic (also known as non-commutative linear logic, I use NCILL for intuitionistic variant)
+feels very restrictive, and it is. In ordered logic,
+"traditional" ${\otimes}\text{R}$ rule must be read literally,
+assumptions have to be used in order, first $\Gamma_1$, then $\Gamma_2$.
+In intuitionistic logic context is like a set, in linear logic
+like a multiset, and in ordered logic like a list.
+
+\begin{equation*}
+\prfinterspace=2em
+\prftree[r]{${\otimes}\text{R}$}
+{\Gamma_1, \Gamma_2, \Gamma_3 \RightarrowLabel{X} \Gamma_2, \Gamma_3}
+{\Gamma_2, \Gamma_3 \RightarrowLabel{Y} \Gamma_3}
+{\Gamma_1, \Gamma_2, \Gamma_3 \RightarrowLabel{X \otimes Y} \Gamma_3}
+\end{equation*}
+
+This makes proof search even more simpler, you'll ever need to look at the
+front of the context (when applying right rules).
+
+And it turns out, that NCILL describes how regular expressions match:
+the match string forms a context (of atomic "propositions"), the regular expression
+is a type of expression we want, and for complete match we expect
+leftover context to be empty. For complete regular expressions, we'll
+need to add lists to the language, but it works out.
+
+Let's match a string \texttt{XY} against \texttt{X(Y$|$Z)} regular expression,
+in other words is
+
+\begin{equation*}
+  X, Y \RightarrowLabel{X \otimes (Y \oplus Z)} \bullet
+\end{equation*}
+
+derivable? It is:
+
+\begin{equation*}
+\prfinterspace=2em
+\prftree[r]{${\otimes}\text{R}$}
+{\prfbyaxiom{\sc Id}{X,Y \RightarrowLabel{X} Y}}
+{\prftree[r]{${\oplus}\text{R}_1$}
+{\prfbyaxiom{\sc Id}{Y \RightarrowLabel{Y} \bullet}}
+{Y \RightarrowLabel{Y \oplus Z} \bullet}
+}
+{X, Y \RightarrowLabel{X \otimes (Y \oplus Z)} \bullet}
+\end{equation*}
+
+The proof search algorithm grew out of regular expression matching
+algorithm using \href{https://en.wikipedia.org/wiki/Brzozowski_derivative}{Brzozowski derivatives}.
+The result is in implementation of \href{2018-09-13-regular-expressions-of-types.html}{Regular expressions of types}
+i.e. \href{https://github.com/phadej/kleene-type}{\texttt{kleene-type}} (\href{http://oleg.fi/haddocks/kleene-type/}{haddocks}).
+
+\subsection{Conclusion}
+
+What could I say. Everything seems to be connected in theoretical computer science.
+Linear logic and regular expressions. Lambda calculi and automata.
+
+More seriously. We can formulate logics differently, so their expressive
+power stays the same, but the resulting "programming language"
+would look different. Maybe more convinient to use, or better in some
+other way.
+
+\end{document}
