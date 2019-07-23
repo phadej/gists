@@ -1,11 +1,13 @@
-Monotone.pdf : Monotone.tex lattice-bool-to-m2.png
-	latexmk -interaction=nonstopmode -pdf -no-shell-escape -bibtex Monotone.tex
+all : Monotone.pdf HigherOrderRoles.pdf
 
-Monotone.tex : src/Monotone.lhs
-	lhs2TeX src/Monotone.lhs > Monotone.tex
+%.pdf : %.tex
+	latexmk -interaction=nonstopmode -pdf -no-shell-escape -bibtex $<
 
-lattice-bool-to-m2.png : lattice-bool-to-m2.dot
-	cat lattice-bool-to-m2.dot | dot -Tpng -olattice-bool-to-m2.png
+%.tex : src/%.lhs
+	lhs2TeX $< > $@
 
-run : 
+build :
+	cabal v2-build libs
+
+run :
 	cabal v2-run monotone

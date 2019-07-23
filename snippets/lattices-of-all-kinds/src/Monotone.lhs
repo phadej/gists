@@ -17,7 +17,7 @@
 
 \title{All kinds of lattices}
 \author{Oleg Grenrus}
-\date{2019-07-21}
+%\date{2019-07-22}
 \begin{document}
 \maketitle
 \iffalse
@@ -32,7 +32,13 @@ build-depends: base, containers, lattices, topograph, process
 \begin{code}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Main (main) where
+module Monotone (
+    Monotone (..),
+    isMonotone,
+    Domain (..),
+    Display (..),
+    main
+    ) where
 
 import           Algebra.Lattice             (BoundedMeetSemiLattice (..), BoundedJoinSemiLattice (..), Lattice (..))
 import           Algebra.Lattice.M2          (M2 (..))
@@ -75,7 +81,6 @@ A \emph{category} consist of the following data
 \item Arrows: $f, g, h, \ldots$
 
 \item For each arrow $f$, there are given objects
-
 \begin{equation*}
 \mathrm{dom}(f), \qquad \mathrm{cod}(f)
 \end{equation*}
@@ -160,7 +165,10 @@ The name will become clear later.
 All partial orders we'll work with, will be instances of the |Domain| typeclass.
 
 We also require that types are |Ord|. The |Ord| instance doesn't need to be
-consistent with |PartialOrd| (and often cannot be). We'll use it to put
+consistent with |PartialOrd|\footnote{%
+We use \href{https://hackage.haskell.org/package/lattices}{\texttt{lattices}} package for lattice related functionality,
+and \href{https://hackage.haskell.org/package/topograph}{\texttt{topograph}} to operate on directed acyclic graphs.
+} (and often cannot be). We'll use it to put
 elements into a |Map| and |Set|, i.e. it's an exposed "implementation detail".
 All finite sets can be totally ordered, so it's not a problem to require.
 
