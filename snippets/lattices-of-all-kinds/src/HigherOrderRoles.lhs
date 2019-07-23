@@ -228,6 +228,11 @@ so we introduce a new primitive, $\lVert - \rVert$ or |truncate|.
 \truncate{\Rep} &= \Phm \\
 \truncate{\Phm} &= \Phm
 \end{align*}
+\begin{code}
+truncate :: Role -> Role
+truncate Nom  = Nom
+truncate _    = Phm
+\end{code}
 More generally, \truncate{-} can be defined for any bounded lattice:
 \begin{align*}
 \truncate{\bot} &= \bot \\
