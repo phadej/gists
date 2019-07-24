@@ -45,6 +45,11 @@ build-depends: base, containers, lattices, topograph, process
 %if 0
 \begin{code}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE PolyKinds #-}
 module HigherOrderRoles where
 
 import Monotone
@@ -52,6 +57,7 @@ import Data.Coerce (Coercible, coerce)
 import Data.Set (Set)
 import Algebra.PartialOrd (PartialOrd (..))
 import Algebra.Lattice (Lattice (..))
+import Data.Kind (Type)
 \end{code}
 %endif
 
@@ -301,13 +307,56 @@ data NestedPhantom b = MkNP [Phantom b] | SomethingElse
 \end{code}
  
 \begin{code}
-data Equality a b where
+
+data Kind = Star | Arrow Kind Kind deriving (Eq, Ord, Show)
+
+data SKind (k :: Kind) where
+    SStar  :: SKind 'Star
+    SArrow :: (SKindI a, SKindI b) => SKind ('Arrow a b)
+
+class SKindI (k :: Kind) where
+    skind :: SKind k
+
+instance SKindI 'Star where
+    skind = SStar
+
+instance (SKindI a, SKindI b) => SKindI ('Arrow a b) where
+    skind = SArrow
+
+type family RelationStar (r :: Role) :: Type -> Type -> Type where
+    RelationStar 'Nom  = Equality
+    RelationStar 'Rep  = Coercion
+    RelationStar 'Phm  = Universal
+
+data RoleExpr (k :: Kind) where
+    Lit :: Role -> RoleExpr 'Star
+    Id  :: RoleExpr ('Arrow a a)
+
+type family ToHaskell (k :: Kind) :: Type where
+    ToHaskell 'Star = Type
+    ToHaskell ('Arrow a b) = ToHaskell a -> ToHaskell b
+
+data P a = P
+
+newtype Poly a (f :: ToHaskell a -> ToHaskell a) (g :: ToHaskell a -> ToHaskell a)
+    = MkPoly
+    { unPoly ::
+        forall (r :: RoleExpr a) (x :: ToHaskell a) (y :: ToHaskell a).
+        P r -> P x -> P y ->
+        Relation a r x y -> Relation a r (f x) (f y)
+    }
+
+type family Relation (k :: Kind) (r :: RoleExpr k) (x :: ToHaskell k) (y :: ToHaskell k) where
+    Relation 'Star ('Lit r) x y = RelationStar r x y
+    Relation ('Arrow a a) 'Id f g = Poly a f g
+
+data Equality (a :: Type) (b :: Type) where
     Refl :: Equality a a
 
-data Coercion a b where
+data Coercion (a :: Type) (b :: Type) where
     Coerce :: Coercible a b => Coercion a b
 
-data Universal a b where
+data Universal (a :: Type) (b :: Type) where
     Something :: Universal a b
 \end{code}
 
