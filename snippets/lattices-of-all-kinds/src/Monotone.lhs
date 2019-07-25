@@ -37,6 +37,7 @@ module Monotone (
     isMonotone,
     Domain (..),
     Display (..),
+    insertionSort,
     main
     ) where
 

@@ -20,6 +20,10 @@
 %format `x` = "\times"
 %format :~: = "\mathbin{:\sim:}"
 %format ~ = "\sim"
+%format k1 = "\mathtt{k}_1"
+%format k2 = "\mathtt{k}_2"
+%format r1 = "\mathtt{r}_1"
+%format r2 = "\mathtt{r}_2"
 
 %format role = "\text{\texttt{\textbf{role}}}"
 
@@ -58,7 +62,7 @@ import Monotone
 import Data.Coerce (Coercible, coerce)
 import Data.Set (Set)
 import Algebra.PartialOrd (PartialOrd (..))
-import Algebra.Lattice (Lattice (..))
+import Algebra.Lattice (Lattice (..), meets, BoundedMeetSemiLattice (..), BoundedJoinSemiLattice  (..), joins, BoundedLattice)
 import Data.Kind (Type)
 
 type Kind = Type
@@ -132,6 +136,14 @@ instance PartialOrd Role where
 instance Lattice Role where
     (/\) = min
     (\/) = max
+instance BoundedMeetSemiLattice Role where
+    top = Phm
+instance BoundedJoinSemiLattice Role where
+    bottom = Nom
+instance Domain Role where
+    elements =  insertionSort leq [ minBound .. maxBound ]
+instance Display Role where
+    display = show
 \end{code}
 
 There could be more equivalences in between, for example user-defined
@@ -446,15 +458,43 @@ only for type constructors. TBW
 \end{example}
 
 Now we can answer a question, what does $|f| \sim_\Nom |g|$ means.
-We need such $r : \Role\to\Role$, so $r\,\Nom = \Nom$.
+We need a $r : \Role\to\Role$, such that $r\,\Nom = \Nom$.
 That will give us the congruence we mentioned previously in \cref{remark:congurence}.
+We could define something like
+\begin{equation*}
+\Nom_{\Role\to\Role} = \sum_{r : Role\to\Role} r \le \Nom\cdot\Phm\cdot\Phm
+\end{equation*}
+but I think it's simply too complicated, ``assumping the worst'' should
+work as well. We can simply overestimate:
+\begin{equation*}
+\Nom_{\Role\to\Role} = \Nom\cdot\Phm\cdot\Phm
+\end{equation*}
+We can identity such ``good enough to respect nominal equality'' element,
+for each kind and define
+\begin{equation*}
+\Nom_{r_1 \to r_2} = \bigvee_{\mathclap{f(\Nom_{r_1}) \le Nom_{r_2}}} f
+\end{equation*}
+\begin{code}
+class (Domain r, BoundedLattice r) => Nominal r where
+    nominal' :: r
+instance Nominal Role where
+    nominal' = Nom
+instance (Nominal r1, Nominal r2) => Nominal (Monotone r1 r2) where
+    nominal' = joins [ f | f <- elements, evalMonotone f nominal' `leq` nominal' ]
+
+test01 :: Bool
+test01 = isMonotone nominal == Just nominal'
+\end{code} 
+
 
 \begin{example}[$\Rep\cdot\Rep\cdot\Rep$ equivalance] TBW
 \end{example}
 
+\section{Fixed points}
 
 \section{Role inference}
 
+\section{Dependent Haskell}
 
 \section{Mumblings}
 
