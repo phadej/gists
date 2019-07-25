@@ -449,8 +449,7 @@ Now we can answer a question, what does $|f| \sim_\Nom |g|$ means.
 We need such $r : \Role\to\Role$, so $r\,\Nom = \Nom$.
 That will give us the congruence we mentioned previously in \cref{remark:congurence}.
 
-
-\begin{example}[$\Rep\cdot\Rep\cdot\Rep$ ...] TBW
+\begin{example}[$\Rep\cdot\Rep\cdot\Rep$ equivalance] TBW
 \end{example}
 
 
