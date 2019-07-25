@@ -19,6 +19,7 @@
 %format \/ = "\mathbin\texttt{\textbackslash/}"
 %format `x` = "\times"
 %format :~: = "\mathbin{:\sim:}"
+%format ~ = "\sim"
 
 %format role = "\text{\texttt{\textbf{role}}}"
 
@@ -45,6 +46,12 @@ build-depends: base, containers, lattices, topograph, process
 %if 0
 \begin{code}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeInType #-}
+{-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 module HigherOrderRoles where
 
 import Monotone
@@ -52,6 +59,9 @@ import Data.Coerce (Coercible, coerce)
 import Data.Set (Set)
 import Algebra.PartialOrd (PartialOrd (..))
 import Algebra.Lattice (Lattice (..))
+import Data.Kind (Type)
+
+type Kind = Type
 \end{code}
 %endif
 
@@ -156,16 +166,33 @@ type role Map nominal representational
 \end{spec}
 to a higher order
 \begin{spec}
-type role Map k v = truncate k \/ v
+type role Map k v = nominal k /\ representational v
 \end{spec}
 We'll explain |truncate| function in the next section.
 
 \section{Type $\to$ Type roles}
 
 |Type -> Type| kinds are prelevant in \Haskell\, so let us see how they
-would work through couple of examples.
+would work through couple of examples. But befor that,
+let's define few functions.
 
-\begin{example}[Box]
+\begin{definition}[$\Role\to\Role$ functions] To manipulate roles
+we need few primitives. Naming is suggestive.
+\begin{code}
+nominal :: Role -> Role
+nominal Nom  = Nom
+nominal _    = Phm
+
+representational :: Role -> Role
+representational r  = r
+
+phantom :: Role -> Role
+phantom Nom = Nom
+phantom _   = Rep
+\end{code}
+\end{definition}
+
+\begin{example}[representational |Box|]
 Let's start with a simple type
 \begin{spec}
 data Box a = Box a
@@ -186,7 +213,7 @@ type role Box representational
 \end{spec}
 \end{example}
 
-\begin{example}[Proxy]
+\begin{example}[phantom |Proxy|]
 Even simpler type than |Box|, is |Proxy|.
 \begin{spec}
 data Proxy a = Proxy
@@ -208,7 +235,7 @@ type role Proxy phantom
 \end{spec}
 \end{example}
 
-\begin{example}[Set]
+\begin{example}[nominal |Set|]
 The third example is |Set a|. |Set a| is an opaque data type,
 which has internal invariants, which rely on |Ord a| instance behaviour.
 For example |Set (Down Int)| coerced from |Set Int| will be badly broken.
@@ -222,17 +249,13 @@ For two unknown types |b| and |c| we can reason, that if
 |b| \sim_\Phm |c| &\Longrightarrow |Set b| \sim_\Phm |Set c|
 \end{align*}
 This kind of function cannot be expressed with lattice operations $\land$ or $\lor$
-so we introduce a new primitive, $\lVert - \rVert$ or |truncate|.
+so we introduce a new primitive, $\lVert - \rVert$ or |nominal|.
 \begin{align*}
 \truncate{\Nom} &= \Nom \\
 \truncate{\Rep} &= \Phm \\
 \truncate{\Phm} &= \Phm
 \end{align*}
-\begin{code}
-truncate :: Role -> Role
-truncate Nom  = Nom
-truncate _    = Phm
-\end{code}
+
 More generally, \truncate{-} can be defined for any bounded lattice:
 \begin{align*}
 \truncate{\bot} &= \bot \\
@@ -254,14 +277,14 @@ In previous three examples we have seen how current |nominal|, |representational
 are represented. This approach simple generalises to higher orders though.
 Before going there, let's investigate these examples a bit more.
 
-\begin{figure}[ht]
+\begin{figure}[hp]
 \centering
 \includegraphics[scale=0.5]{lat-zho2zho}
 \caption{$\Role\to\Role$ lattice}
 \label{fig:role2role}
 \end{figure}
 
-\begin{figure}[ht]
+\begin{figure}[hp]
 \centering
 \includegraphics[scale=0.5]{lat-zho2zho-a}
 \caption{$\Role\to\Role$ lattice, where $\Nom \mapsto \Nom$}
@@ -275,6 +298,168 @@ In all three previous examples we have
 This is a property of type constructors (and type families).
 However, in theory we should (\todo{do we?}{or can solver just fail}) be able to represent ``non-anchored''
 functions as well.
+
+\section{Equivalences of higher order}
+
+It's relatively simple to understand what does the $\sim_\Nom$ or $\sim_\Rep$
+means. In \Haskell\ and type theories we may write |f :~: g| or $f \equiv g$
+for things of the |Type -> Type| kind. Yet for representational equality,
+we at best could write something like
+\begin{spec}
+type Coercible1 f g = forall x y. Coercible x y => Coercible (f x) (g y)
+\end{spec}
+What does $f \sim_{\lambda x \mapsto y} g$ mean?
+
+We propose that the answer is \emph{functional extensionality}\todo{cite}{the HoTT book or not?}.
+
+\begin{definition}[functional extensionality]
+\emph{functional extensionality} says that two functions are equal,
+if their .... It's an \emph{external} properety, therefore a name,
+It's an axiom, which doesn't (alone?) break
+your type theory.  A non-dependent version is, for objects $f, g : A \to B$
+\begin{equation*}
+f \equiv_{A\to B} g \cong \prod_{x : A}  f\,x \equiv_B f\,x
+\end{equation*}
+\end{definition}
+
+We can extend functional extensionality right hand side to be
+\begin{equation*}
+\prod_{x y : A} x \equiv_A y \to f\,x \equiv_B f\,y
+\end{equation*}
+
+Getting ahead of ourselves, we can write something similar
+in \Haskell:
+\begin{code}
+type Equality1 f g = forall x y. Equality x y -> Equality (f x) (g y)
+\end{code}
+Let's define |Equality| and other equivalences next.
+
+\begin{definition}[Equivalence witnessess] Using GADTs
+we can capture evidence of equivalences:
+\begin{code}
+data Equality a b where
+    Refl :: a ~ b => Equality a b
+
+data Coercion a b where
+    Coerce :: Coercible a b => Coercion a b
+
+data Universal a b where
+    Something :: Universal a b
+\end{code}
+\todo{a name for |Universal| and |Something|}{could be something else, but what?}
+We can also write a type family, mapping a promoted |Role| to a \emph{witness}
+of respectful equivalence. \todo{|RoleForType|}{is a bad name}
+\begin{code}
+type family RoleForType (r :: Role) :: Type -> Type -> Type where
+    RoleForType Nom = Equality
+    RoleForType Rep = Coercion
+    RoleForType Phm = Universal
+\end{code}
+\end{definition}
+
+\begin{remark}[Everything respects $\sim_\Nom$]
+\label{remark:congurence}
+As the $\sim_\Nom$ is propositional equality, everything should respect it,
+we have a principle of congruence. For all types, |x, y| and type functions
+|M :: A -> B|
+\begin{equation*}
+|x| \sim_\Nom |y| \to |M x| \sim_\Nom |M y|
+\end{equation*}
+\begin{code}
+cong :: Equality a b -> Equality (f a) (f b)
+cong Refl = Refl
+\end{code}
+The above holds for type constructors and type families.
+However, for other equivalences, e.g. $\sim_\Nom$ similar statement doesn't hold
+\begin{equation*}
+x \equiv_A y \not\to M\,x \equiv_B M\,y
+\end{equation*}
+For a counter example, take |Set|.
+\end{remark}
+
+\begin{definition}[Equivalence witnesses indexed by roles]
+We can generalise |RoleForType| to higher kinds. The following will be in pseudo-\Haskell.
+
+Assume there is a data type for \emph{closed role expressions},
+indexed by their kind:
+\begin{code}
+data RoleExpr (k :: Kind) where
+    RoleConst  :: Role -> RoleExpr Type
+    RoleId     :: RoleExpr (k -> k)
+    -- \ldots STLC syntax, in some way, plus primitives
+\end{code}
+
+Then there could a type or data family, or GADT for witnesses,
+generalising |RoleForType|
+\begin{code}
+data Witness (k :: Type) (r :: RoleExpr k) (x :: k) (y :: k) where
+  W_Const  ::  SRole r 
+           ->  RoleForType r x y
+           ->  Witness Type (RoleConst r) x y
+  W_Id     ::  (forall r u v. Witness k r u v -> Witness k r (f u) (g v))
+           ->  Witness (k -> k) RoleId f g
+  -- \ldots and for other constructors
+\end{code}
+The |SRole| is defined in the next example.
+
+A \emph{tricky part} of this whole business is to completely define |RoleExpr|
+and |Witness|. Especially in a way which is amenable for an implementation.
+Note, that as currently, |Witness| would be 0-bit data type; this
+definition is to simulate what a compiler could do internally.
+\end{definition}
+
+\begin{example}[singletons overdrive]
+This example hopefully highlights, that we don't do anything beyond
+any compiler level of understand. GHC could handle this already. It's just not convininent for real use.
+Let's define singletons for |Role| so we can define some |Witness|.
+\begin{code}
+data SRole (r :: Role) where
+    SNom :: SRole Nom
+    SRep :: SRole Rep
+    SPhm :: SRole Phm
+
+class     SRoleI (r :: Role)  where srole  ::  SRole r
+instance  SRoleI Nom          where srole  =   SNom
+instance  SRoleI Rep          where srole  =   SRep
+instance  SRoleI Phm          where srole  =   SPhm
+\end{code}
+And we can play with |Witness|
+\begin{code}
+newtype Identity a = Identity { runIdentity :: a }
+
+identityW :: Witness (Type -> Type) RoleId Identity Identity
+identityW = W_Id witness where
+    witness   ::  forall r x y. Witness Type r x y
+              ->  Witness Type r (Identity x) (Identity y)
+    witness (W_Const r equiv) = witness' r equiv
+    
+    witness'  ::  SRole r -> RoleForType r x y
+              ->  Witness Type (RoleConst r) (Identity x) (Identity y)
+    witness' SNom  Refl    = W_Const SNom Refl
+    witness' SRep  Coerce  = W_Const SRep Coerce
+    witness' SPhm  _       = W_Const SPhm Something
+\end{code}
+\end{example}
+
+\begin{example}[Injectivity]
+only for type constructors. TBW
+\end{example}
+
+Now we can answer a question, what does $|f| \sim_\Nom |g|$ means.
+We need such $r : \Role\to\Role$, so $r\,\Nom = \Nom$.
+That will give us the congruence we mentioned previously in \cref{remark:congurence}.
+
+
+\begin{example}[$\Rep\cdot\Rep\cdot\Rep$ ...] TBW
+\end{example}
+
+
+\section{Role inference}
+
+
+\section{Mumblings}
+
+
 On \cref{fig:role2role} we can see that $\Role\to\Role$ lattice has ten
 elements; and even if we ``anchor'' \Nom, \cref{fig:role2role-a}, there are
 still 6 elements. What are the other ones (\todo{good for}{what})?
@@ -298,17 +483,6 @@ Is this something solver can use as \todo{a heuristic}{I have no ideas about sol
 newtype Age = MkAge Int
 data Phantom b = Phantom
 data NestedPhantom b = MkNP [Phantom b] | SomethingElse
-\end{code}
- 
-\begin{code}
-data Equality a b where
-    Refl :: Equality a a
-
-data Coercion a b where
-    Coerce :: Coercible a b => Coercion a b
-
-data Universal a b where
-    Something :: Universal a b
 \end{code}
 
 \end{document}
