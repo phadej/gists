@@ -24,7 +24,14 @@
 %format k2 = "\mathtt{k}_2"
 %format r1 = "\mathtt{r}_1"
 %format r2 = "\mathtt{r}_2"
+%format <$> = "\mathbin{\texttt{<\$>}}"
+%format <*> = "\mathbin{\texttt{<*>}}"
+%format ==  = "\mathbin{\texttt{==}}"
 
+% REPL prompt
+%format *>>> = "\lambda\!\!\vartriangleright"
+
+% Additional keyword
 %format role = "\text{\texttt{\textbf{role}}}"
 
 \newcommand{\Nom}{\ensuremath{\mathsf{Nom}}}
@@ -78,7 +85,7 @@ and its spin-off proposal \emph{Coercions without type constructor roles}\footno
 
 \emph{Safe Zero-cost Coercions for Haskell} are introduced by Joachim Breitner et al.
 \cite{Breitner:2014}.
-There is also recent work for \emph{A Role for Dependent Types in Haskell} by Stephanie Weirich et al. 
+There is also recent work for \emph{A Role for Dependent Types in Haskell} by Stephanie Weirich et al.
 \cite{1905.13706}.
 
 Our idea is simple: embrace the higher order. If there are functions of types,
@@ -401,11 +408,13 @@ data RoleExpr (k :: Kind) where
     -- \ldots STLC syntax, in some way, plus primitives
 \end{code}
 
+\todo{Add an execution of RoleExpr}
+
 Then there could a type or data family, or GADT for witnesses,
 generalising |RoleForType|
 \begin{code}
 data Witness (k :: Type) (r :: RoleExpr k) (x :: k) (y :: k) where
-  W_Const  ::  SRole r 
+  W_Const  ::  SRole r
            ->  RoleForType r x y
            ->  Witness Type (RoleConst r) x y
   W_Id     ::  (forall r u v. Witness k r u v -> Witness k r (f u) (g v))
@@ -444,7 +453,7 @@ identityW = W_Id witness where
     witness   ::  forall r x y. Witness Type r x y
               ->  Witness Type r (Identity x) (Identity y)
     witness (W_Const r equiv) = witness' r equiv
-    
+
     witness'  ::  SRole r -> RoleForType r x y
               ->  Witness Type (RoleConst r) (Identity x) (Identity y)
     witness' SNom  Refl    = W_Const SNom Refl
@@ -454,7 +463,7 @@ identityW = W_Id witness where
 \end{example}
 
 \begin{example}[Injectivity]
-only for type constructors. TBW
+only for type constructors. \todo{TBW}{}
 \end{example}
 
 Now we can answer a question, what does $|f| \sim_\Nom |g|$ means.
@@ -484,23 +493,73 @@ instance (Nominal r1, Nominal r2) => Nominal (Monotone r1 r2) where
 
 test01 :: Bool
 test01 = isMonotone nominal == Just nominal'
-\end{code} 
+\end{code}
+
+For phantom roles we'll need a definition, which preserves nominal
+equality, but otherwise marks everything as phantom.
+\begin{code}
+phantom' :: Nominal r => r -> Role
+phantom' r  | leq r nominal'  = Nom
+            | otherwise       = Rep
+\end{code}
+|phantom'| is monotone. Check!
 
 
-\begin{example}[$\Rep\cdot\Rep\cdot\Rep$ equivalance] TBW
+\begin{example}[$\Rep\cdot\Rep\cdot\Rep$ equivalance]
+\todo{TBW}{}
 \end{example}
 
 \section{Fixed points}
 
-TBW
+\todo{TBW}{}
 
 \section{Role inference}
 
-TBW
+\todo{TBW}{}
 
 \section{Rules sketch}
 
-TBW
+\todo{TBW}{}
+
+\section{Role inference}
+
+The procedure (for non recursive ADTs) is quite direct, and functional!
+\begin{enumerate}
+\item mark all arguments as |phantom'| to respect nominal equality
+\item translate the ADT syntax as is, replacing all sums and products operations
+by $\lor$, and concrete types by their role.
+\todo{Role for concrete types, like |Int| is \Nom}{explain why}.
+\item simplify by evaluation
+\end{enumerate}
+
+\begin{example}[role for |Foo|]
+Let's consider simple ADT
+\begin{code}
+data Foo a = FooInt Int | FooX a
+\end{code}
+The raw translation is
+\begin{code}
+fooRole :: Role -> Role
+fooRole a  =   phantom' a  -- marking all arguments phantom by default
+           \/  Nom         -- |FooInt| constructor
+           \/  a           -- |FooX| constructor
+\end{code}
+And |fooRole| is |representational| as expected.
+\begin{spec}
+*>>> display <$> isMonotone fooRole
+Just "NomRepPhm"
+*>>> (==) <$> isMonotone fooRole  <*> isMonotone representational
+Just True
+\end{spec}
+\end{example}
+
+\begin{example}[some more exciting types]
+\todo{TBW}{}
+\end{example}
+
+\begin{example}[some recursive types]
+\todo{TBW}{}
+\end{example}
 
 \section{Dependent Haskell}
 
