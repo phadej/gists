@@ -69,8 +69,11 @@ import Monotone
 import Data.Coerce (Coercible, coerce)
 import Data.Set (Set)
 import Algebra.PartialOrd (PartialOrd (..))
-import Algebra.Lattice (Lattice (..), meets, BoundedMeetSemiLattice (..), BoundedJoinSemiLattice  (..), joins, BoundedLattice)
+import Algebra.Lattice (Lattice (..), meets, BoundedMeetSemiLattice (..), BoundedJoinSemiLattice  (..), joins, BoundedLattice, lfp, gfp, gfpFrom, lfpFrom)
 import Data.Kind (Type)
+import Data.Maybe (fromJust)
+
+import qualified Control.Category as C
 
 type Kind = Type
 \end{code}
@@ -558,6 +561,27 @@ Just True
 \end{example}
 
 \begin{example}[some recursive types]
+\todo{TBW}{}
+\begin{code}
+data List a = Nil   | Cons a  (List a)
+data Nat1 a = Zero  | Succ    (Nat1 a)
+\end{code}
+\begin{code}
+listRole :: Role -> Role
+listRole = evalMonotone $ lfp $ \rec -> fromJust $ isMonotone $ \a ->
+        phantom' a
+    \/  a \/ evalMonotone rec a
+
+nat1Role :: Role -> Role
+nat1Role = evalMonotone $ lfp $ \rec -> fromJust $ isMonotone $ \a ->
+        phantom' a
+    \/  evalMonotone rec a
+\end{code}
+Should be |listRole = representational|, |nat1Role = phantom|. seems to work
+\todo{tests}{, we need to write}
+\end{example}
+
+\begin{example}{mutually recursive types}
 \todo{TBW}{}
 \end{example}
 
