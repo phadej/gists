@@ -19,7 +19,7 @@ Category theory may say...
 The identity law comes from category theory, so what could category theory
 say about `fmap coerce = coerce` like proposition?
 
-Let us consider an endofunctor $F$ from a three element category, $\mathcal{{C}$ to itself,
+Let us consider an endofunctor $F$ from a three element category $\mathcal{C}$ to itself,
 which "rotates the category".
 
 <img title="functor-abc" src="../images/functor-abc.png" />
@@ -141,7 +141,7 @@ current `Mag` has `type role Mag representational nominal nominal`.
 A third alternative is to use
 
 ```
-One :: Coercible b c -> a -> Mag a b c
+One :: Coercible b c => a -> Mag a b c
 ```
 
 GHC is smart enough to infer that this `Mag` variant is also `representational`
@@ -149,25 +149,28 @@ in all arguments. Unfortunately, to implement `traverseBiaWith`,
 we'll need to change the required constraints 
 
 ```diff
--Biapplicative p
+-  Biapplicative p
 +( Biapplicative p
-+, forall x y. (Coercible b x, Coercible c y) => Coercible (p b c) (p x y))
++, forall u v x y. (Coercible u x, Coercible v y)
++                => Coercible (p u v) (p x y))
 +)
 ```
 
 ... or require `Bifunctor` (a superclass of `Biapplicative`) to be parametric in its both arguments!
 
-For me, it looks like that addition of `(forall x y. Coercible x y => Coercible (f x) (f y))`
+For me, it looks like that the addition of `(forall x y. Coercible x y => Coercible (f x) (f y))`
 constraint to `Functor` (and similarly for `Bifunctor`, `Profunctor`, `Contravariant` ...) can be worked around in *all cases*.
-The `Mag` is the only example mentioned as *useful* but not lawful `Functor`,
+The `Mag` is the only example mentioned as *useful* but not lawful `Functor`, [^magref]
 and we have demonstrated a required change.
+
+[^magref]: For example in https://ryanglscott.github.io/2018/06/22/quantifiedconstraints-and-the-trouble-with-traversable/
 
 Note: `Mag` will still be unlawful, but it can be made `representational` in all arguments.
 In the implementation of `traverseBiaWith` we will use `coerce` which is free operationally, so there shouldn't be any performance degradation.
 
 I cannot come up with an example of `f :: Type -> Type` which would violate `fmap id = id`
 law, but obey `fmap coerce = coerce` one (or an opposite direction).
-And I cannot show that one follows from another.
+And I cannot show that `fmap coerce = coerce` follows from other two `Functor` laws, but without using parametricity.
 [Edward Kmett explains how](https://www.schoolofhaskell.com/user/edwardk/snippets/fmap)
 `Functor` composition law follows from identity law and parametricity.
 Coerce law is implied by parametricity directly.
@@ -184,9 +187,34 @@ even the change departs us far far from Haskell2010.
 The justification is that these requirements are implied by *parametricity*,
 and `Functor` class should contain only parametric type constructors.
 We would still be able to have unlawful `Functor`s if really needed.
+
 Some immediate benefits are ability to put [`join` into `Monad`](https://ryanglscott.github.io/2018/03/04/how-quantifiedconstraints-can-let-us-put-join-back-in-monad/)
 or that van Laarhoven `Lens s t a b` would be `representable` in all arguments.
 
+The disadvantage is that there's [Haskell 2010](https://www.haskell.org/onlinereport/haskell2010/) code which would be broken by
+that change. Consider
+
+```haskell
+data Eq a => Foo a
+```
+
+We can write (unlawful) `Functor` instance in Haskell 2010,
+which won't be accepted, as `Foo` role is `nominal`. Yet,
+GHC documentation about [`DatatypeContexts`](https://downloads.haskell.org/~ghc/8.6.5/docs/html/users_guide/glasgow_exts.html#extension-DatatypeContexts)
+says *This is widely considered a misfeature, and is going to be removed from the language.*
+You need to **enable** a language feature to write `Foo`, in other words
+that code is already broken (since [November 2010](https://www.haskell.org/ghc/download_ghc_7_0_1.html)!)
+
+Only adding `fmap coerce = coerce` law wouldn't break any code.
+Something which is unlawful will be a bit more unlawful.
+The hypothesis is that `fmap coerce = coerce` won't make any currently lawful
+`Functor`s into unlawful one.
+
+Acknowledgments
+---------------
+
+I'm thankful to Ryan Scott for many discussions and valuable insights.
+And to Andres Löh for comments on a draft of this post.
 
 Appendix: Mapping of morphisms
 ------------------------------
