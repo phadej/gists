@@ -205,7 +205,20 @@ says *This is widely considered a misfeature, and is going to be removed from th
 You need to **enable** a language feature to write `Foo`, in other words
 that code is already broken (since [November 2010](https://www.haskell.org/ghc/download_ghc_7_0_1.html)!)
 
-Only adding `fmap coerce = coerce` law wouldn't break any code.
+Also a non-Haskell2010 code will be broken:
+
+```haskell
+type family Id (x :: Type) :: Type where
+  Id x = x
+
+newtype I x = I (Id x)
+```
+
+You may think, there's an easy solution, but there is [a five year old issue about roles for type families](https://gitlab.haskell.org/ghc/ghc/issues/8177).
+Also it have to be investigated, if someone actually wrote an (unlawful) `Functor` wrapping
+a type family which pattern matches (i.e. is non-parametric) on an argument, and why they did that!
+
+Just adding `fmap coerce = coerce` law wouldn't break any code.
 Something which is unlawful will be a bit more unlawful.
 The hypothesis is that `fmap coerce = coerce` won't make any currently lawful
 `Functor`s into unlawful one.
