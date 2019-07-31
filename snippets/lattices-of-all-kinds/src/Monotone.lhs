@@ -11,9 +11,14 @@
 %format . = "\mathbin\mathtt{.}"
 %format && = "\mathbin\mathtt{\&\&}"
 %format $ = "\mathbin\mathtt{\$}"
-%format /\ = "\land"
-%format \/ = "\lor"
+%format /\ = "\mathbin{\texttt{\textbackslash/}}"
+%format \/ = "\mathbin{\texttt{/\textbackslash}}"
 %format `x` = "\times"
+%format *** = "\mathbin{\texttt{***}}"
+%format &&& = "\mathbin{\texttt{\&\&\&}}"
+%format -<  = "\Yleft"
+
+%format proc = "\text{\texttt{\textbf{proc}}}"
 
 \title{All kinds of lattices}
 \author{Oleg Grenrus}
@@ -30,11 +35,15 @@ build-depends: base, containers, lattices, topograph, process
 
 %if 0
 \begin{code}
+{-# LANGUAGE Arrows #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Monotone (
     Monotone (..),
     isMonotone,
+    monotoneI,
+    monotoneK,
+    monotoneC,
     Domain (..),
     Display (..),
     insertionSort,
@@ -54,6 +63,7 @@ import           Data.Set                    (Set)
 import           System.Process              (readProcess)
 import           Topograph                   (adjacencyList, reduction, runG)
 
+import qualified Control.Arrow               as A
 import qualified Control.Category            as C
 import qualified Data.Map                    as Map
 import qualified Data.Set                    as Set
@@ -425,7 +435,7 @@ We can see on figure, that |f| indeed gives a picture of |Bool| in |M2|.
 In \Haskell\ we have only written
 a mapping of objects, |True| and |False|. The mapping of arrows is something
 we need to check, to be able to claim that |f| is a functor, and therefore
-a monotone function. The other way around, there are mappings from 
+a monotone function. The other way around, there are mappings from
 |Bool| to |M2| which aren't monotone, and aren't functors.
 
 In this section we went backwards. More principal approach would been to first
@@ -503,7 +513,7 @@ We must check that
 and that projection functions
 $p_1 : P \times Q \to P$
 and
-$p_2 : P \times Q \to Q$ are monotone, as 
+$p_2 : P \times Q \to Q$ are monotone, as
 the pairing $\langle f, g \rangle : X \to P \times Q$,
 if $f : X \to P$ and $g : X \to Q$.
 A lot to check, but it all holds.
@@ -630,7 +640,7 @@ Let's encode coproducts in \Haskell. Coproduct or \emph{sum} of sets is
 \begin{code}
 instance (PartialOrd a, PartialOrd b) => PartialOrd (Either a b) where
     leq (Left a)   (Left a')   = leq a a'
-    leq (Right b)  (Right b')  = leq b b' 
+    leq (Right b)  (Right b')  = leq b b'
     leq _          _           = False
 
 instance (Display a, Display b) => Display (Either a b) where
@@ -772,7 +782,7 @@ instance (Domain a, Ord b) => Ord (Monotone a b) where
 \end{code}
 
 |Lattice| instances are defined pointwise.
-Note, that while |Monotone| preserve joins and meets, also 
+Note, that while |Monotone| preserve joins and meets, also
 joins and meets of a arbitrary subset, but it doesn't
 preserve $\top$ and $\bot$ elements.
 Yet, all \emph{finite} lattices do have $\top$ and $\bot$ elements.
@@ -876,7 +886,7 @@ outputBoolToZHO  =
 
 Exponential lattices with |M2| are pretty. |ZHO -> M2| (\cref{fig:zho2m2})
 has nice planar graph. The |M2 -> ZHO| (\cref{fig:m22zho}) has few
-overlapping edges. |M2 -> M2| (\cref{fig:m22m2}) starts to 
+overlapping edges. |M2 -> M2| (\cref{fig:m22m2}) starts to
 exercise \emph{Graphviz} layout algorithm. Yet the final stress test is
 |(ZHO -> ZHO) -> ZHO|, or $\mathtt{ZHO}^{\mathtt{ZHO}^\mathtt{ZHO}}$ is on \cref{fig:big}.
 A beautiful monster.
@@ -1040,4 +1050,42 @@ main = do
     outputM2ToZHO
     outputBig
 \end{code}
+
+\section{Arrow}
+
+|Monotone| is almost an |Arrow|. Every combinator is monotone,
+except |arr|, where we have to be careful.
+
+\begin{code}
+instance A.Arrow Monotone where
+    arr = M -- here we can introduce bugs.
+
+    first   (M f)  = M (A.first f)
+    second  (M f)  = M (A.second f)
+
+    M f *** M g  =  M (f A.*** g)
+    M f &&& M g  =  M (f A.&&& g)
+\end{code}
+
+Then we can use \emph{Arrow-notation}\footnote{\texttt{Arrows} GHC language extension}
+
+\begin{code}
+rotate  ::  Monotone (x, y, z) (y, x, z)
+rotate  =   proc (x, y, z) ->
+    C.id -< (y, x, z)
+\end{code}
+
+\section{Extra combinators}
+
+\begin{code}
+monotoneI   ::  Monotone a a
+monotoneI   =   M id
+
+monotoneK   ::  b -> Monotone a b
+monotoneK   =   \b -> M (const b)
+
+monotoneC   ::  Monotone b c -> Monotone a b -> Monotone a c
+monotoneC   =   \f g -> M (evalMonotone f . evalMonotone g)
+\end{code}
+
 \end{document}
