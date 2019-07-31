@@ -60,15 +60,16 @@ build-depends: base, containers, lattices, topograph, process
 
 %if 0
 \begin{code}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 module HigherOrderRoles where
 
@@ -523,7 +524,7 @@ phantom' r  | leq r nominal'  = Nom
 \end{example}
 
 
-\section{Current approach overapproxmates}
+\section{Current approach overapproximates}
 
 Consider a simple data type:
 \begin{code}
@@ -573,6 +574,39 @@ Just False
 *>>> leq <$> isMonotone apRole <*> isMonotone apRoleNow
 Just True
 \end{spec}
+
+\subsection{Reasoning}
+
+Lattices are used in constraint solving a lot (\todo{maybe I should find at least a citation}{}),
+in a language with $\lor$ and $\land$ and equality $=$.  One could
+ask questions like
+\begin{equation*}
+x \lor c_1 \land c_2 = c_3  \quad\Rightarrow\quad x = \text{?}
+\end{equation*}
+
+Here we try to solve more complex problem, where we have monotone functions
+as well
+\begin{equation*}
+f(c_1) \lor c_2 \land c_3 = c_4 \quad\Rightarrow\quad f = \text{?}
+\end{equation*}
+
+Where former problem is ``simple'', latter is hard, isn't it?
+In both cases we are interested in ``the best'' (smallest) solution, i.e. for all other solutions $y$ or $g$
+$x \le y$ or $f \le g$.
+
+For finite ``generating'' lattices, like $\Role$, we can solve
+the problems by simply enumerating; but that's extremely slow.
+We need to be more clever.
+In first order problem enumerating is ok approach: there are only three options.
+
+Currently in GHC roles are using first-order language (there are functions, but they all are known)
+\begin{equation*}
+|type role Ap representational nominal| \Rightarrow \roleOf{|Ap|} = \lambda\,(f : \Role)\,(x : \Role) \mapsto f \lor \mathsf{nominal}(x)
+\end{equation*}
+but we want higher-order:
+\begin{equation*}
+|type role Ap = \f a -> f a| \Rightarrow \roleOf{|Ap|} = \lambda\,(f : \Role\to\Role)\,(x : \Role) \mapsto f(x)
+\end{equation*}
 
 \section{Fixed points}
 
@@ -631,12 +665,12 @@ data Nat1 a = Zero  | Succ    (Nat1 a)
 \end{code}
 \begin{code}
 listRole :: Role -> Role
-listRole = evalMonotone $ lfp $ \rec -> fromJust $ isMonotone $ \a ->
+listRole = evalMonotone $ lfp $ \rec -> unsafeMonotone $ \a ->
         phantom' a
     \/  a \/ evalMonotone rec a
 
 nat1Role :: Role -> Role
-nat1Role = evalMonotone $ lfp $ \rec -> fromJust $ isMonotone $ \a ->
+nat1Role = evalMonotone $ lfp $ \rec -> unsafeMonotone $ \a ->
         phantom' a
     \/  evalMonotone rec a
 \end{code}
@@ -730,29 +764,37 @@ void1Role a = phantom' a
 \end{code}
 \end{example}
 
-\section{Reasoning}
+\begin{example}[Fix] Fixed points need fixed points.
+\begin{code}
+newtype Fix f = Fix (f (Fix f))
+\end{code}
 
-Lattices are used in constraint solving a lot (\todo{maybe I should find at least a citation}{}),
-in a language with $\lor$ and $\land$ and equality $=$.  One could
-ask questions like
-\begin{equation*}
-x \lor c_1 \land c_2 = c_3  \quad\Rightarrow\quad x = \text{?}
-\end{equation*}
+\begin{spec}
+type role Fix nominal  -- GHC now
+\end{spec}
 
-Here we try to solve more complex problem, where we have monotone functions
-as well
-\begin{equation*}
-f(c_1) \lor c_2 \land c_3 = c_4 \quad\Rightarrow\quad f = \text{?}
-\end{equation*}
+\begin{code}
+fixRole :: (Role /> Role) -> Role
+fixRole = evalMonotone $ lfp $ \rec -> unsafeMonotone $ \f ->
+   phantom' f \/
+   f @@ evalMonotone rec f
 
-Where former problem is ``simple'', latter is hard, isn't it?
-In both cases we are interested in ``the best'' (smallest) solution, i.e. for all other solutions $y$ or $g$
-$x \le y$ or $f \le g$.
+fixRole2 :: (Role /> Role) -> Role
+fixRole2 f = lfp (\x -> phantom' f \/ f @@ x)
 
-For finite ``generating'' lattices, like $\Role$, we can solve
-the problems by simply enumerating; but that's extremely slow.
-We need to be more clever.
-In first order problem enumerating is ok approach: there are only three options.
+-- current GHC
+approx :: (Role /> Role) -> Role
+approx r = nominal' @@ r
+
+-- $|ZipList| \sim_{|axiomZipListList|} |List|$
+axiomZipListList :: Role /> Role
+axiomZipListList = unsafeMonotone $ \case
+    Nom -> Rep
+    Rep -> Rep
+    Phm -> Phm
+\end{code}
+\end{example}
+
 
 \section{Dependent Haskell}
 
