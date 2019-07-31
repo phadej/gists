@@ -495,7 +495,14 @@ work as well. We can simply overestimate:
 We can identity such ``good enough to respect nominal equality'' element,
 for each kind and define
 \begin{equation*}
-\Nom_{r_1 \to r_2} = \bigvee_{\mathclap{f(\Nom_{r_1}) \le Nom_{r_2}}} f
+\Nom_{r_1 \to r_2} = \bigvee_{\mathclap{f(\Nom_{r_1}) \le \Nom_{r_2}}} f
+\end{equation*}
+... and if we reason, we realise that
+\begin{equation*}
+\Nom_{r_1 \to r_2} = x \mapsto \begin{cases}
+\Nom_{r_2} & \text{if } x \le \Nom_{r_1} \\
+\top       & \text{otherwise}
+\end{cases}
 \end{equation*}
 \begin{code}
 class (Domain r, BoundedLattice r) => Nominal r where
@@ -503,7 +510,11 @@ class (Domain r, BoundedLattice r) => Nominal r where
 instance Nominal Role where
     nominal' = Nom
 instance (Nominal r1, Nominal r2) => Nominal (Monotone r1 r2) where
-    nominal' = joins [ f | f <- elements, evalMonotone f nominal' `leq` nominal' ]
+    nominal' = unsafeMonotone $ \r1 -> if leq r1 nominal' then nominal' else top
+
+-- slow version
+nominal2 :: (Nominal r1, Nominal r2) => Monotone r1 r2
+nominal2 = joins [ f | f <- elements, evalMonotone f nominal' `leq` nominal' ]
 
 test01 :: Bool
 test01 = isMonotone nominal == Just nominal'
@@ -511,6 +522,7 @@ test01 = isMonotone nominal == Just nominal'
 
 For phantom roles we'll need a definition, which preserves nominal
 equality, but otherwise marks everything as phantom.
+Quite similar to |nominal'|.
 \begin{code}
 phantom' :: Nominal r => r -> Role
 phantom' r  | leq r nominal'  = Nom
@@ -749,6 +761,15 @@ test1   =   \Refl -> Refl
 test2  ::  Coercion (Dict (MonadReader r1 m1)) (Dict (MonadReader r2 m2))
        ->  (Equality r1 r2, Equality m1 m2)
 test2  =   \Coerce -> (Refl, Refl)
+\end{code}
+
+Non-dependent arguments (|m|) are marked |nominal'|,
+dependent arguments (|r|) are replaced with |nominal'| (\todo{is this right thing to do?}{why?, seems to work}).
+\begin{code}
+monadReaderRole :: Role -> (Role /> Role) -> Role
+monadReaderRole _ m = phantom' m
+    \/ nominal' @@ m
+    \/ m @@ nominal'
 \end{code}
 
 Explain this in \cref{sec:backreasoning}
