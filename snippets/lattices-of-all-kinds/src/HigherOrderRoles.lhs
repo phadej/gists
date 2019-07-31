@@ -29,6 +29,7 @@
 %format ==  = "\mathbin{\texttt{==}}"
 %format />  = "\rightharpoonup"
 %format @@  = "\cdot"
+%format `nah` = "\ne"
 
 % REPL prompt
 %format *>>> = "\lambda\!\!\vartriangleright"
@@ -76,6 +77,7 @@ import Algebra.Lattice (Lattice (..), meets, BoundedMeetSemiLattice (..), Bounde
 import Algebra.PartialOrd (PartialOrd (..))
 import Data.Coerce (Coercible, coerce)
 import Data.Kind (Type)
+import Control.Applicative (ZipList (..))
 import Data.Maybe (fromJust)
 import Data.Set (Set)
 
@@ -327,6 +329,7 @@ This is a property of type constructors (and type families).
 However, in theory we should (\todo{do we?}{or can solver just fail}) be able to represent ``non-anchored''
 functions as well.
 
+
 \section{Equivalences of higher order}
 
 It's relatively simple to understand what does the $\sim_\Nom$ or $\sim_\Rep$
@@ -338,7 +341,7 @@ type Coercible1 f g = forall x y. Coercible x y => Coercible (f x) (g y)
 \end{spec}
 What does $f \sim_{\lambda x \mapsto y} g$ mean?
 
-We propose that the answer is \emph{functional extensionality}\todo{cite}{the HoTT book or not?}.
+We propose that the answer is \emph{functional extensionality}
 
 \begin{definition}[functional extensionality]
 \emph{functional extensionality} says that two functions are equal,
@@ -398,11 +401,12 @@ cong :: Equality a b -> Equality (f a) (f b)
 cong Refl = Refl
 \end{code}
 The above holds for type constructors and type families.
-However, for other equivalences, e.g. $\sim_\Nom$ similar statement doesn't hold
+However, for other equivalences, e.g. $\sim_\Rep$ similar statement doesn't hold,
+in general
 \begin{equation*}
-x \equiv_A y \not\to M\,x \equiv_B M\,y
+x \sim_\Rep y \not\to M\,x \sim_\Rep M\,y
 \end{equation*}
-For a counter example, take |Set|.
+For a counter example, take $M = |Set|$.
 \end{remark}
 
 \begin{definition}[Equivalence witnesses indexed by roles]
@@ -518,11 +522,59 @@ phantom' r  | leq r nominal'  = Nom
 \todo{TBW}{}
 \end{example}
 
+
+\section{Current approach overapproxmates}
+
+Consider a simple data type:
+\begin{code}
+data Ap f a = Ap (f a)
+\end{code}
+
+GHC tells that its role is
+\begin{spec}
+type role Ap representational nominal
+\end{spec}
+
+We can do
+\begin{code}
+coerceAp1 :: Ap [] a -> Ap ZipList a
+coerceAp1 = coerce
+\end{code}
+or even
+\begin{code}
+coerceAp2 :: Coercible f g => Ap f a -> Ap g a
+coerceAp2 = coerce
+\end{code}
+where |Coercible f g| is weird beast. But not
+\begin{spec}
+coerceAp3 :: Coercible a b => Ap [] a -> Ap ZipList b
+coerceAp3 `nah` coerce
+\end{spec}
+
+So it looks like that current role for |Ap| can be intepretted as a role expression
+\begin{code}
+apRoleNow :: (Monotone Role Role, Role) -> Role
+apRoleNow (f, a)  =   f' @@ a
+                  \/  nominal' @@ a
+  where
+    f' = f -- f is representational/parametric, so identity mapping
+\end{code}
+but we can make more precise role
+\begin{code}
+apRole :: (Monotone Role Role, Role) -> Role
+apRole (f, a) = f @@ a
+\end{code}
+
+which is smaller, i.e. better: $|apRole| \le |apRoleNow|$
+
+\begin{spec}
+*>>> leq <$> isMonotone apRoleNow <*> isMonotone apRole
+Just False
+*>>> leq <$> isMonotone apRole <*> isMonotone apRoleNow
+Just True
+\end{spec}
+
 \section{Fixed points}
-
-\todo{TBW}{}
-
-\section{Role inference}
 
 \todo{TBW}{}
 
@@ -602,6 +654,9 @@ Should be |listRole = representational|, |nat1Role = phantom|. seems to work
 
 \begin{example}[existentials] Existentials contain *some* variables,
 we must assume the worst, i.e. |nominal'|.
+
+Here |/>| is a monotone function, and |f @@ x| is application,
+i.e. |Monotone| and |evalMonotone|.
 \begin{code}
 data Exists c a where
     MkExists :: c a b => b -> Exists c a
@@ -697,6 +752,8 @@ Is this something solver can use as \todo{a heuristic}{I have no ideas about sol
 \section{TODO}
 \begin{itemize}
 \item not star kinds
+\item Can \emph{Compiling to categories} make code for writing role expressions
+nicer? i.e. no |->| in types, only |/>|, but ordinary lambda expressions.
 \end{itemize}
 
 \begin{code}
