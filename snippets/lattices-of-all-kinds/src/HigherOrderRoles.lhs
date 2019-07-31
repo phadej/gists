@@ -492,7 +492,15 @@ test01 = isMonotone nominal == Just nominal'
 
 \section{Fixed points}
 
+TBW
+
 \section{Role inference}
+
+TBW
+
+\section{Rules sketch}
+
+TBW
 
 \section{Dependent Haskell}
 
