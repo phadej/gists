@@ -730,6 +730,30 @@ void1Role a = phantom' a
 \end{code}
 \end{example}
 
+\section{Reasoning}
+
+Lattices are used in constraint solving a lot (\todo{maybe I should find at least a citation}{}),
+in a language with $\lor$ and $\land$ and equality $=$.  One could
+ask questions like
+\begin{equation*}
+x \lor c_1 \land c_2 = c_3  \quad\Rightarrow\quad x = \text{?}
+\end{equation*}
+
+Here we try to solve more complex problem, where we have monotone functions
+as well
+\begin{equation*}
+f(c_1) \lor c_2 \land c_3 = c_4 \quad\Rightarrow\quad f = \text{?}
+\end{equation*}
+
+Where former problem is ``simple'', latter is hard, isn't it?
+In both cases we are interested in ``the best'' (smallest) solution, i.e. for all other solutions $y$ or $g$
+$x \le y$ or $f \le g$.
+
+For finite ``generating'' lattices, like $\Role$, we can solve
+the problems by simply enumerating; but that's extremely slow.
+We need to be more clever.
+In first order problem enumerating is ok approach: there are only three options.
+
 \section{Dependent Haskell}
 
 \section{Mumblings}
