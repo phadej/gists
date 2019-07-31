@@ -17,6 +17,8 @@
 %format *** = "\mathbin{\texttt{***}}"
 %format &&& = "\mathbin{\texttt{\&\&\&}}"
 %format -<  = "\Yleft"
+%format />  = "\rightharpoonup"
+%format @@  = "\cdot"
 
 %format proc = "\text{\texttt{\textbf{proc}}}"
 
@@ -38,12 +40,31 @@ build-depends: base, containers, lattices, topograph, process
 {-# LANGUAGE Arrows #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeOperators #-}
 module Monotone (
+    -- * Monotone
     Monotone (..),
+    type (/>),
+    (@@),
     isMonotone,
-    monotoneI,
-    monotoneK,
-    monotoneC,
+    -- * Combinators
+    idM,
+    composeM,
+    -- ** Product
+    pairM,
+    fstM,
+    sndM,
+    -- ** Exponential
+    curryM,
+    uncurryM,
+    evalM,
+    -- ** More
+    constM,
+    joinM,
+    meetM,
+    -- ** Unsafe
+    unsafeMonotone,
+    -- * Auxiliary
     Domain (..),
     Display (..),
     insertionSort,
@@ -1078,14 +1099,51 @@ rotate  =   proc (x, y, z) ->
 \section{Extra combinators}
 
 \begin{code}
-monotoneI   ::  Monotone a a
-monotoneI   =   M id
+type a /> b = Monotone a b
+infixr 0 />
 
-monotoneK   ::  b -> Monotone a b
-monotoneK   =   \b -> M (const b)
+(@@) :: a /> b -> a -> b
+(@@) = evalMonotone
+infixl 7 @@
 
-monotoneC   ::  Monotone b c -> Monotone a b -> Monotone a c
-monotoneC   =   \f g -> M (evalMonotone f . evalMonotone g)
+unsafeMonotone :: (a -> b) -> (a /> b)
+unsafeMonotone = M
+
+idM        ::  a /> a
+idM        =   M id
+
+constM     ::  b -> (a /> b)
+constM     =   \b -> M (const b)
+
+pairM      ::  (a /> b) -> (a /> c) -> (a /> (b, c))
+pairM      =   \f g -> M $ \x -> (f @@ x, g @@ x)
+
+fstM       ::  (a, b) /> a
+fstM       =   M fst
+
+sndM       ::  (a, b) />  b
+sndM       =   M snd
+
+evalM      ::  (a /> b, a) /> b
+evalM      =   M $ \(f, x) -> f @@ x
+
+composeM   ::  (b /> c) -> (a /> b) -> (a /> c)
+composeM   =   \f g -> M $ \x -> f @@ (g @@ x)
+
+curryM     ::  ((a, b) /> c) -> a /> b /> c
+curryM     =   \f -> makeM2 $ curry $ \xy -> f @@ xy
+
+uncurryM     ::  (a /> b /> c) -> ((a, b) /> c)
+uncurryM     =   \f -> M $ \(x, y) -> f @@ x @@ y
+
+joinM      ::  Lattice a => a /> a /> a
+joinM      =   makeM2 (\/)
+
+meetM      ::  Lattice a => a /> a /> a
+meetM      =   makeM2 (/\)
+
+makeM2 :: (a -> b -> c) -> (a /> b /> c)
+makeM2 f = M $ \x -> M (f x)
 \end{code}
 
 \end{document}

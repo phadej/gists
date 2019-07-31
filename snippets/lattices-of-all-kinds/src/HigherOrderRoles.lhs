@@ -27,12 +27,15 @@
 %format <$> = "\mathbin{\texttt{<\$>}}"
 %format <*> = "\mathbin{\texttt{<*>}}"
 %format ==  = "\mathbin{\texttt{==}}"
+%format />  = "\rightharpoonup"
+%format @@  = "\cdot"
 
 % REPL prompt
 %format *>>> = "\lambda\!\!\vartriangleright"
 
 % Additional keyword
-%format role = "\text{\texttt{\textbf{role}}}"
+%format role    = "\text{\texttt{\textbf{role}}}"
+%format family  = "\text{\texttt{\textbf{family}}}"
 
 \newcommand{\Nom}{\ensuremath{\mathsf{Nom}}}
 \newcommand{\Rep}{\ensuremath{\mathsf{Rep}}}
@@ -59,19 +62,22 @@ build-depends: base, containers, lattices, topograph, process
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeInType #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 module HigherOrderRoles where
 
 import Monotone
-import Data.Coerce (Coercible, coerce)
-import Data.Set (Set)
-import Algebra.PartialOrd (PartialOrd (..))
 import Algebra.Lattice (Lattice (..), meets, BoundedMeetSemiLattice (..), BoundedJoinSemiLattice  (..), joins, BoundedLattice, lfp, gfp, gfpFrom, lfpFrom)
+import Algebra.PartialOrd (PartialOrd (..))
+import Data.Coerce (Coercible, coerce)
 import Data.Kind (Type)
 import Data.Maybe (fromJust)
+import Data.Set (Set)
 
 import qualified Control.Category as C
 
@@ -360,13 +366,13 @@ Let's define |Equality| and other equivalences next.
 we can capture evidence of equivalences:
 \begin{code}
 data Equality a b where
-    Refl :: a ~ b => Equality a b
+    Refl       :: a ~ b          =>  Equality a b
 
 data Coercion a b where
-    Coerce :: Coercible a b => Coercion a b
+    Coerce     :: Coercible a b  =>  Coercion a b
 
 data Universal a b where
-    Something :: Universal a b
+    Something  ::                    Universal a b
 \end{code}
 \todo{a name for |Universal| and |Something|}{could be something else, but what?}
 We can also write a type family, mapping a promoted |Role| to a \emph{witness}
@@ -520,6 +526,11 @@ phantom' r  | leq r nominal'  = Nom
 
 \todo{TBW}{}
 
+\section{Backreasoning}
+\label{sec:backreasoning}
+
+\todo{TBW}{}
+
 \section{Rules sketch}
 
 \todo{TBW}{}
@@ -581,8 +592,87 @@ Should be |listRole = representational|, |nat1Role = phantom|. seems to work
 \todo{tests}{, we need to write}
 \end{example}
 
-\begin{example}{mutually recursive types}
+\begin{example}[mutually recursive types]
 \todo{TBW}{}
+\end{example}
+
+\begin{example}[universal]
+\todo{TBW}{}
+\end{example}
+
+\begin{example}[existentials] Existentials contain *some* variables,
+we must assume the worst, i.e. |nominal'|.
+\begin{code}
+data Exists c a where
+    MkExists :: c a b => b -> Exists c a
+\end{code}
+
+\begin{code}
+existsRole :: (Role /> Role /> Role) -> Role -> Role
+existsRole c a  =   phantom' c \/ phantom' a
+                \/  c @@ a @@ b \/ b
+  where
+    b = nominal'
+
+\end{code}
+
+If |c = ~|, which has nominal roles
+\begin{code}
+equalityRole :: Role /> Role /> Role
+equalityRole = nominal'
+
+-- $\Nom\cdot\Phm\cdot\Phm$
+existsEq :: Role -> Role
+existsEq = existsRole equalityRole
+\end{code}
+
+Or if |c = Coercible|
+\begin{code}
+coercibleRole :: Role /> Role /> Role
+coercibleRole = joinM
+
+-- $\Nom\cdot\Rep\cdot\Phm$
+existsCoe :: Role -> Role
+existsCoe = existsRole coercibleRole
+\end{code}
+
+Recall, normal type-classes have nominal role, |Coercible| is special.
+I cannot come with a reason for $|Dict (SomeClass a)| \sim_\Rep |Dict (SomeClass b)|$.
+
+With \texttt{FunctionalDependencies}:
+\begin{code}
+class Monad m => MonadReader r m | m -> r where
+  ask :: m r
+\end{code}
+What the role should be? (Note our |MonadReader| doesn't have non-algebraic |local|).
+From $|Dict (MonadReader r1 m)| \sim_\Nom |Dict (MonadReader r2 m)|$
+we should be able to deduce $|r1| \sim_\Nom |r2|$, shouldn't we?
+
+And this does work in GHC today!
+\begin{code}
+data Dict c where
+    MkDict :: c => Dict c
+
+test1  ::  Equality (Dict (MonadReader r1 m)) (Dict (MonadReader r2 m))
+       ->  Equality r1 r2
+test1   =   \Refl -> Refl
+
+test2  ::  Coercion (Dict (MonadReader r1 m1)) (Dict (MonadReader r2 m2))
+       ->  (Equality r1 r2, Equality m1 m2)
+test2  =   \Coerce -> (Refl, Refl)
+\end{code}
+
+Explain this in \cref{sec:backreasoning}
+\end{example}
+
+\begin{example}[Void1] |Void1| is no different from |Proxy| role-wise.
+\begin{code}
+data Void1 (a :: Type)
+
+-- $\Nom\cdot\Rep\cdot\Rep$
+void1Role :: Role -> Role
+void1Role a = phantom' a
+\end{code}
 \end{example}
 
 \section{Dependent Haskell}
