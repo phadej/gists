@@ -11,15 +11,24 @@
 
 		<!-- conditionals -->
 		<WordDetect attribute="Stanza" context="cond" String="if" insensitive="true"/>
+		<WordDetect attribute="Stanza" context="#stay" String="library" insensitive="true"/>
+		<WordDetect attribute="Stanza" context="#stay" String="executable" insensitive="true"/>
 
 		<!-- field names -->
 		<DetectChar attribute="FieldName" char=":" />
 		<WordDetect attribute="FieldName" String="build-depends" insensitive="true" />
+		<WordDetect attribute="FieldName" String="exposed-modules" insensitive="true" />
+		<WordDetect attribute="FieldName" String="main-is" insensitive="true" />
+		<WordDetect attribute="FieldName" String="mixins" insensitive="true" />
+		<WordDetect attribute="FieldName" String="reexported-modules" insensitive="true" />
+		<WordDetect attribute="FieldName" String="signatures" insensitive="true" />
+		<WordDetect attribute="FieldName" String="tested-with" insensitive="true" />
 
 		<!-- version ranges -->
-		<RegExpr attribute="VersionRange" String="(>=|&lt;)\s+\d+(\.\d+)*" />
+        <RegExpr attribute="VersionRange" String="(>=|\^>=|==|&lt;)\s*\d+(\.\d+)*" />
 
 		<StringDetect attribute="Operator" String="&amp;&amp;" />
+		<StringDetect attribute="Operator" String="||" />
 
 		<!-- package names -->
 		<RegExpr attribute="Normal Text" String="[a-zA-Z0-9-]+" firstNonSpace="true" />
