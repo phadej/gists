@@ -18,7 +18,7 @@ Either a b ≡ forall r. (a -> r) -> (b -> r) -> r
 or
 
 ```
-    (a, b) ≡ forall r. (a -> b -> r)
+    (a, b) ≡ forall r. (a -> b -> r) -> r
 ```
 
 or
