@@ -4,8 +4,8 @@ author: Oleg Grenrus
 ---
 
 These are notes of the talk I gave at [ClojuTre 2019](https://clojutre.org/2019/).
-There should be a video recording of the talk, I'll add a link here.
-There's [the slide deck as PDF too](https://oleg.fi/pdfs/write-a-compiler.pdf).
+There is [a video recording of the talk](https://www.youtube.com/watch?v=kOXfdZRD0wM),
+and [the slide deck as a PDF](https://oleg.fi/pdfs/write-a-compiler.pdf).
 
 [<img title="cc-by-sa" src="../images/by-sa.svg" />
 This work is licensed under a “CC BY SA 4.0” license.

@@ -4,7 +4,8 @@ author: Oleg Grenrus
 ---
 
 This is a script of the talk I gave at [Small FP 2018](https://clojutre.org/2018/).
-There should be a video recording of the talk, I'll add a link here.
+There is [a video recording of the talk](https://www.youtube.com/watch?v=gTrU_BxWH7c)
+and [the slide deck as a PDF](https://oleg.fi/pdfs/regular-expressions-of-types.pdf).
 
 <div id="toc"></div>
 
