@@ -288,6 +288,7 @@ linear logic using \href{https://hackage.haskell.org/package/bound}{\texttt{boun
 See an \href{https://github.com/phadej/write-yourself-a-typed-functional-language/blob/master/src/LLC.hs}{example} from my \href{https://skillsmatter.com/skillscasts/12389-write-yourself-a-typed-functional-language}{HaskellX 2018 talk}.
 
 So the implementation concerns are second reason to use leftover typing.
+This idea is described in \emph{Typing with Leftovers - A mechanization of Intuitionistic Multiplicative-Additive Linear Logic} by Guillaume Allais (TYPES 2017).
 
 \subsubsection{Scoping...}
 
@@ -335,6 +336,7 @@ case abc of
 
 Looks like |c| is out-of-scope, but it isn't, given the rules.
 This \emph{might} affect what we can do with $\&$ and $\oplus$ rules.
+There are also might be some consequences for substitution. I'm not sure.
 
 Note however, that this unconvential behaviour isn't possible in "LLC in Agda"
 like encoding: there the scoping is normal, only usages are tracked with
@@ -404,6 +406,9 @@ The proof search algorithm grew out of regular expression matching
 algorithm using \href{https://en.wikipedia.org/wiki/Brzozowski_derivative}{Brzozowski derivatives}.
 The result is in implementation of \href{2018-09-13-regular-expressions-of-types.html}{Regular expressions of types}
 i.e. \href{https://github.com/phadej/kleene-type}{\texttt{kleene-type}} (\href{http://oleg.fi/haddocks/kleene-type/}{haddocks}).
+
+See [Certified Proof Search for Intuitionistic Linear Logic](https://gallais.github.io/proof-search-ILLWiL/).
+I'm rediscovering things Guillaume Allais alrady did.
 
 \subsection{Conclusion}
 
