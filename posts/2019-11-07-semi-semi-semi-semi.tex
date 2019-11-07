@@ -1,0 +1,276 @@
+\documentclass{article}
+%include polycode.fmt
+%
+\begin{document}
+
+Semigroups, semigroupoids... are there more semithings?
+
+\subsection{Group, Semigroup, Monoid}
+
+Let's start "from the beginning". Groups is 19th century thing.  A \emph{group}
+is a set $G$ with a binary operation $\bullet$, identity element $e$ and
+inverse element $a^{-1}$ for each $a \in G$.
+With an obvious laws you can imagine relating these.
+
+If we remove \emph{identity} element from a group, "obviously" we get a \emph{semigroup}.
+Because if there's \emph{any} element $x \in G$, we can recover the identity
+element by $e = x \bullet x^{-1}$.
+
+So what's a semigroup with identity element? For sometimes it were just that,
+until we started call it \emph{monoid}. Go figure, naming is hard, not only in
+programming, but also in mathematics.\foonote{\url{https://math.stackexchange.com/questions/156952/why-the-terminology-monoid}}
+
+\subsection{Category, Groupoid, Semigroupoid}
+
+You are hopefully familiar with a concept of a category.
+I repeat a definition here:
+
+\begin{definition}[Awodey 1.1]\textbf{Definition} (Awodey 1.1)
+A \emph{category} consist of the following data
+\begin{itemize}
+\item Objects: $A, B, C, \ldots$
+\item Arrows: $f, g, h, \ldots$
+
+\item For each arrow $f$, there are given objects
+
+\begin{equation*}
+\mathrm{dom}(f), \qquad \mathrm{cod}(f)
+\end{equation*}
+
+called the \emph{domain} and \emph{codomain} of $f$. We write
+
+\begin{equation*}
+f : A \to B
+\end{equation*}
+
+to indicate that $A = \mathrm{dom}(f)$ and $B = \mathrm{cod}(f)$.
+
+\item Given arrows $f : A \to B$ and $g : B \to C$, that is, with
+
+\begin{equation*}
+\mathrm{cod}(f) = \mathrm{dom}(g)
+\end{equation*}
+
+there is given an arrow
+
+\begin{equation*}
+g \circ f : A \to C
+\end{equation*}
+
+called the \emph{composite} of $f$ and $g$.
+
+\item For each object $A$, there is given an arrow
+
+\begin{equation*}
+1_A : A \to A
+\end{equation*}
+
+called the \emph{identity arrow} of $A$.
+
+\item Associativity:
+
+\begin{equation*}
+h \circ (g \circ f) = (h \circ g) \circ f
+\end{equation*}
+
+for all $f : A \to B$, $g : B \to C$, $h : C \to D$.
+
+\item Unit:
+
+\begin{equation*}
+f \circ 1_A = f = 1_B \circ f
+\end{equation*}
+
+for all $f : A \to B$.
+\end{itemize}
+\end{definition}
+
+If you think hard (or read a book), you'll learn that a single object
+category is a monoid: category arrows are monoid elements, and the
+laws work out.
+
+The group analogue is called \emph{groupoid}. In addition to
+category data, we require that for each arrow $f : A \to B$ there is an inverse arrow $f^{-1} : B \to A$,
+such that $f \circ f^{-1} = 1_B$ and $f^{-1} \circ f = 1_A$.
+Or more succinctly: that each arrow is an isomorphism.
+
+But we can also remove stuff: if we remove identity arrows,
+and unit law we get \emph{semigroupoid}.
+
+\begin{definition}\textbf{Definition}
+A \emph{semigroupoid} consist of the following data
+\begin{itemize}
+\item Objects: $A, B, C, \ldots$
+\item Arrows: $f, g, h, \ldots$
+
+\item For each arrow $f$, there are given objects
+
+\begin{equation*}
+\mathrm{dom}(f), \qquad \mathrm{cod}(f)
+\end{equation*}
+
+called the \emph{domain} and \emph{codomain} of $f$. We write
+
+\begin{equation*}
+f : A \to B
+\end{equation*}
+
+to indicate that $A = \mathrm{dom}(f)$ and $B = \mathrm{cod}(f)$.
+
+\item Given arrows $f : A \to B$ and $g : B \to C$, that is, with
+
+\begin{equation*}
+\mathrm{cod}(f) = \mathrm{dom}(g)
+\end{equation*}
+
+there is given an arrow
+
+\begin{equation*}
+g \circ f : A \to C
+\end{equation*}
+
+called the \emph{composite} of $f$ and $g$.
+
+\item Associativity:
+
+\begin{equation*}
+h \circ (g \circ f) = (h \circ g) \circ f
+\end{equation*}
+
+for all $f : A \to B$, $g : B \to C$, $h : C \to D$.
+
+\end{itemize}
+\end{definition}
+
+A reader probably ask themselves: are there interesting, not-contrived
+examples of semigroupoids, which aren't also categories?
+There are. If poset (set with partial order) is 
+an example of category, then a set with strict order\footnote{\url{http://mathworld.wolfram.com/StrictOrder.html}, I not dare to call the set with strict order a soset},
+is an example of semigroupoid.
+
+As a concrete example, natural numbers with an unique arrow between $n$ and $m$ when $n < m$ is a semigroupoid.
+
+\begin{equation}
+0 < 1 < 2 < 3 < 4 < \cdots
+\end{equation}
+
+There are no identity arrow, as $n \not< n$, but associativity works out:
+if $n < m$ and $m < p$ then $n < p$. Let's call this semigroupoid $\mathbf{LT}$.
+
+Finally, a plot twist. \href{https://ncatlab.org/nlab/show/semicategory}{nLab} calls semigroupoids semicategories,
+and don't even mention a semigroupoid as an alternative name!
+
+\subsection{Functors, Semifunctors...}
+
+Recall a definition of functor.
+
+\begin{definition}[Awodey 1.2]\textbf{Definition} (Awodey 1.2)
+A \emph{functor}
+
+\begin{equation*}
+F : \mathbf{C} \to \mathbf{D}
+\end{equation*}
+
+between categories $\mathbf{C}$ and $\mathbf{D}$ is a mapping of objects
+to objects and arrows to arrows, in such a way that
+\begin{itemize}
+\item $F (f : A \to B) = F(f) : F(A) \to F(B)$,
+\item $F(1_A) = 1_{F(A)}$,
+\item $F(g \circ f) = F(g) \circ F(f)$.
+\end{itemize}
+That is, $F$ preserves domains and codomains, identity arrows,
+and composition. A functor $F : \mathbf{C} \to \mathbf{D}$ thus gives
+a sort of "picture" -- perhaps distorted -- of $\mathbf{C}$ in $\mathbf{D}$.
+\end{definition}
+
+Functors preserve identities, but semigroupoids don't have identities to be preserved.
+We need a weaker concept:
+
+\begin{definition}\textbf{Definition}
+A \emph{semifunctor}
+
+\begin{equation*}
+F : \mathbf{C} \to \mathbf{D}
+\end{equation*}
+
+between semigroupoids $\mathbf{C}$ and $\mathbf{D}$ is a mapping of objects
+to objects and arrows to arrows, in such a way that
+\begin{itemize}
+\item $F (f : A \to B) = F(f) : F(A) \to F(B)$,
+\item $F(g \circ f) = F(g) \circ F(f)$.
+\end{itemize}
+That is, $F$ preserves domains and codomains,
+and composition. A functor $F : \mathbf{C} \to \mathbf{D}$ thus gives
+a sort of "picture" -- perhaps distorted -- of $\mathbf{C}$ in $\mathbf{D}$.
+\end{definition}
+
+An identity functor is obviously a semifunctor, also a successor functor $S : \mathbf{N} \to \mathbf{N}$
+is a semifunctor $\mathbf{LT} \to \mathbf{LT}$.
+
+In Haskell, that would be silly to define a class for (endo)semifunctors:
+
+\begin{code}
+-- semimap f . semimap g = semimap (f . g)
+class Semifunctor f where
+    semimap :: (a -> b) -> f a -> f b
+\end{code}
+
+It's the |Functor| type-class without an identity law.
+On the other hand, something like
+
+\begin{code}
+data Mag a b t where
+    Map   :: (x -> t) -> Mag a b x -> Mag a b t
+    One   :: a -> Mag a b b
+
+instance Semifunctor (Mag a b) where
+    fmap f (Map g x) = Map (f . g) x
+    fmap f x         = Map f x
+\end{code}
+
+would be valid.
+
+\subsection{Semimonad?}
+
+Now as we have semifunctors, would it make sense to ask whether
+endosemifunctors can form a monad
+
+\begin{definition}\textbf{Semimonad}
+A \emph{semimonad} on semigroupoid $C$ consists of
+\begin{itemize}
+\item an endosemifunctor $T : C \to C$
+\item semi natural transformation $\eta : 1_C \to T$ (|return|)
+\item semi natural transformation $\mu : T^2 \to T$  (|join|)
+\item Associativity (as semi natural transformations $T^3 \to T$)
+
+\begin{equation}
+\mu \circ T \mu = \mu \circ \mu T
+\end{equation}
+
+\item Identity (as semi natural transformations  $T \to T$)
+
+\begin{equation}
+\mu \circ T\eta = \mu \circ \eta T = 1_T
+\end{equation}
+\end{itemize}
+\end{definition}
+
+Looks a lot like monad, but for semifunctors. I have an example: the $S$ semifunctor
+is a semimonad. Feels like (I didn't check) that all strictly monotonic functions would fit.
+We need to find some more structured semigroupoid than $\mathbf{LT}$ to find more interesting semimonads, but I haven't yet.
+
+I end with a catchy phrase:
+
+\emph{A semimonad is a monoid (!) in the category of endosemifunctors.}
+
+What would be a semigroup in the category of endofunctors\footnote{in Haskell we call it |Bind|, at least now (or |Apply| for different semigroup)}, or
+a semigroup in the category of endosemifunctors?
+
+Naming is hard.
+
+\subsection{References: More on the theory of semi-functors}
+
+There's a paper \emph{The theory of semi-functors} by
+Raymond Hoofman \url{https://doi.org/10.1017/S096012950000013X}.
+
+\end{document}
