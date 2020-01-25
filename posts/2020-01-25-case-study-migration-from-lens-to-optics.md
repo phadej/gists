@@ -25,7 +25,7 @@ The whole codebase is a bit over 70000 lines in 800 files.
 One disclaimer is that I do this *for fun* and  *out of curiosity*, in other
 words Futurice didn't ask me to do this (fun is subjective).  Another
 disclaimer is that my experiences shouldn't not be extrapolated into how easy
-or hard this kind of migration is, only that it's possible. I'm way to familiar
+or hard this kind of migration is, only that it's possible. I'm way too familiar
 with the codebase under "migration", as well as with `lens` and `optics`
 libraries.  On the other hand, it turned relatively *easy for me*, and I share
 my experiences, so *it would be easier for others*.
@@ -53,8 +53,8 @@ All these libraries depend on `lens`. But we can use them with `optics` too,
 as I'll show later. And even we wouldn't have libraries with lens interface,
 the `lens` is there somewhere in codebases of this scale. The HMR build plan
 consists of *over 500 components*, from which about 400 are dependencies from Hackage.
-In fact, from this "industrial" point of view, if `microlens` didn't exist.
-It's just duplicate code somewhere there. In the dependency closure there are e.g.
+In fact, from this "industrial" point of view, it would be better if `microlens` didn't exist.
+It's just more duplicate code somewhere there. In the dependency closure there are e.g.
 
 ```plain
 microlens-th-0.4.3.2
@@ -64,16 +64,16 @@ lens-4.17.1
 ```
 
 There are also multiple implementations of other things, so this
-problem is not only with optics.
+problem is not unique to van Laarhoven lens libraries.
 
 My current project has about 450 components in the build plan, so this scale is not unique.
 
 On the other hand, one proper reason to use `optics` could be better type
-errors.  (I'm too experiences to judge that properly but `optics` at least
+errors.  (I'm too experienced to judge that properly but `optics` at least
 tries to produces better errors).  Another complelling reason is
 `OverloadedLabels` which *just work* with `optics`. We'll see example of that.
 Thanks to [Andrzej Rybczak PR](#https://github.com/GetShopTV/swagger2/pull/200),
-`swagger2`  package has optics interface via `OverloadedLabels` (since version 2.5), and it's neat.
+`swagger2`  package has `optics` interface via `OverloadedLabels` (since version 2.5), and it's neat.
 
 futurice-prelude
 ----------------
