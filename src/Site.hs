@@ -163,6 +163,7 @@ pandocFormulaOptions = def
             , "\\usepackage{mathpazo}"
             , "\\usepackage{mathtools}"
             , "\\usepackage{prftree}"
+            , "\\usepackage{xcolor}"
             -- proofs (find-right-laws)
             , "\\newcommand{\\equivvia}[1]{\\equiv\\!\\!\\langle\\ #1\\ \\rangle}"
             -- with leftovers
