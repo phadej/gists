@@ -248,12 +248,12 @@ $$
 $$
 
 where ${\color{blue}\mathit{s}}[{\color{blue}\mathit{x}} \to {\color{blue}\mathit{r}}]$
-is a syntax for substitution.
+is a notation for substitution.
 
 To have let-expressions we need to represent *variables* and be
 able to perform substitution. My tool of choice for that
-is [`bound`](https://hackage.haskell.org/package/bound),
-but for the sake of being self-contained we'll define needed bits here.
+is [`bound`](https://hackage.haskell.org/package/bound) library,
+but for the sake of being self-contained we'll define the needed bits inline.
 We'll also do a simple variant of bound, essentially it is
 de Bruijn indices using polymorphic recursion.
 
@@ -560,11 +560,11 @@ Let's see how it works. The same example as we did with `ex1` executes nicely:
 
 $$
 \begin{aligned}
-& \mathtt{\color{red!50!blue}abab} &&\vdash_\varepsilon \mathbf{fix}\,{\color{blue}\mathit{x}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}} \\
-& \mathtt{\color{red!50!blue}bab} &&\vdash_\kappa \mathbf{let}\,{\color{blue}\mathit{x}}=\mathbf{fix}\,{\color{blue}\mathit{x}_{\mathtt{\color{red!50!blue}}1}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}_{\mathtt{\color{red!50!blue}}1}}\,\mathbf{in}\,\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}} \\
-& \mathtt{\color{red!50!blue}ab} &&\vdash_\varepsilon \mathbf{fix}\,{\color{blue}\mathit{x}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}} \\
-& \mathtt{\color{red!50!blue}b} &&\vdash_\kappa \mathbf{let}\,{\color{blue}\mathit{x}}=\mathbf{fix}\,{\color{blue}\mathit{x}_{\mathtt{\color{red!50!blue}}1}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}_{\mathtt{\color{red!50!blue}}1}}\,\mathbf{in}\,\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}} \\
-&{\color{red!80!black}\varepsilon} &&\vdash_\varepsilon \mathbf{fix}\,{\color{blue}\mathit{x}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}} \\
+& \mathtt{\color{red!50!blue}abab} &&\vdash \mathbf{fix}\,{\color{blue}\mathit{x}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}} \\
+& \mathtt{\color{red!50!blue}bab} &&\vdash \mathbf{let}\,{\color{blue}\mathit{x}}=\mathbf{fix}\,{\color{blue}\mathit{x}_{\mathtt{\color{red!50!blue}}1}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}_{\mathtt{\color{red!50!blue}}1}}\,\mathbf{in}\,\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}} \\
+& \mathtt{\color{red!50!blue}ab} &&\vdash \mathbf{fix}\,{\color{blue}\mathit{x}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}} \\
+& \mathtt{\color{red!50!blue}b} &&\vdash \mathbf{let}\,{\color{blue}\mathit{x}}=\mathbf{fix}\,{\color{blue}\mathit{x}_{\mathtt{\color{red!50!blue}}1}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}_{\mathtt{\color{red!50!blue}}1}}\,\mathbf{in}\,\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}} \\
+&{\color{red!80!black}\varepsilon} &&\vdash \mathbf{fix}\,{\color{blue}\mathit{x}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}} \\
 \end{aligned}
 $$
 
@@ -724,24 +724,6 @@ $$
 \end{aligned}
 $$
 
-A short note on performance
----------------------------
-
-The note is short, because I haven't measured anything.
-The examples above run at interactive speed in GHCi,
-and I suspect that collecting and pretty-printing the traces is
-not free.
-
-It's really hard to tell how slow this is.
-Not all smart constructors are cheap,
-e.g. the `let_` one is expensive as it checks whether the
-expression is closed. Also `fix_` perform a substitution.
-On the other hand, expression size doesn't seem to explode
-exponentially, which is a good sign.
-
-I'm quite sure that Might, Darais, Spiewak approach is more efficient,
-but this one is elegantly pure.
-
 Conversion from context-free grammars
 -------------------------------------
 
@@ -781,43 +763,125 @@ $$
 
 The conversion from context-free grammar to recursive regular expression
 relies on a simple observation: Context free grammars
-can be represented as fixpoint of $\mathsf{RE}^n \to \mathsf{RE}^n$ function,
+can be represented as fixed point of $\mathsf{RE}^n \to \mathsf{RE}^n$ function,
 `letrec` with multiple variables. Using theorem by Bekić
 we can reduce it to a fixed point on of $\mathsf{RE} \to \mathsf{RE}$ function.
 
-**Theorem** (Bekić, [*Programming Languages and Their Definition*](https://dl.acm.org/doi/10.5555/1878))
+**Bisection lemma** (Bekić, [*Definable operations in general algebras, and the theory of automata and flowcharts*](https://doi.org/10.1007/BFb0048939)):
 
+For monotone $f : P \times Q \to P$ and $g : P \times Q \to Q$
 
-Conclusion and further work
+$$
+\left(\mathbf{fix}_{P\times Q} ( x,y ) = ((x,y) , g(x,y) )\right) = (x_0, y_0)
+$$
+
+where
+
+$$
+\begin{aligned}
+x_0 & = (\mathbf{fix}_P\,x = f(x, y_0))
+\\
+y_0 & = (\mathbf{fix}_Q\,y = g(x_0, y))
+\end{aligned}
+$$
+
+We can use bisection lemma to eliminate simultaneous recursion in CFG,
+reducing it to recursive regular expression.
+A CFG is a fixed point of $h_n : \mathsf{RE}^n \to \mathsf{RE}^n$,
+We can assume that there's at least one production, the starting symbol.
+If CFG has only one single production, than we can convert it to recursive
+regular expression using $\mathbf{fix}$.
+Otherwise $n = 1 + m$, take $P = \mathsf{RE}$ and $Q = \mathsf{RE}^m$
+mextract functions $f : \mathsf{RE} \times \mathsf{RE}^m \to \mathsf{RE}$
+and $g : \mathsf{RE} \times \mathsf{RE}^m \to \mathsf{RE}^m$,
+and define
+
+$$
+h_m \bar{y} = \begin{aligned}[t]
+\mathbf{let}\, &x_0 = \mathbf{fix}\,x = f(x, \bar{y}) \\
+\mathbf{in}\,& g(x_0, \bar{y})
+\end{aligned}
+$$ 
+
+where $\bar{y}$ means $m$ distinct $\mathsf{RE}$ variables.
+
+Using this equation we can iterate top-level production removal,
+until we reach the single production base case.
+
+A short note on performance
 ---------------------------
+
+The note is short, because I haven't really measured anything.
+The examples above run at interactive speed in GHCi,
+and I suspect that collecting and pretty-printing the traces is
+not free.
+
+I wrote the parser from above using `parsec`:
+
+```haskell
+ex7parsec :: P.Parser ()
+ex7parsec = expr where
+    expr   = void $ P.try (mult >> P.char '*' >> expr) <|> mult
+    mult   = void $ P.try (term >> P.char '+' >> mult) <|> term
+    term   = P.try digits <|> void (P.char '(' *> expr *> P.char ')')
+    digits = void $ some digit
+    digit  = P.char '0'
+         <|> P.char '1'
+         <|> P.char '2'
+         <|> P.char '3'
+```
+
+Note, that it only *recognises*, i.e. doesn't build a parse tree,
+but also uses `try`. This makes the comparison a bit more fair.
+
+The result is salty. The recursive-regexp approach is
+1000-10000 times slower (and getting slower the longer the input string is).
+Not really surprising, as the matching algorithm recomputes
+a lot of things on each character, but still unfortunate.
+
+Conclusion
+----------
 
 It was nice to combine known things in a new way, the result is interesting.
 
-Another question is whether expressions in this format
-can be compared for an equivalence. If they can represent all CFGs,
-then the answer is **No**, as that problem is generally undecidable.
-But maybe there's some equivalence (broader than structural equality, even
-after applying smart constructors), which could be somehow useful?
+As a consequence, we know that we can add recursive types
+to non-commutative intuitionistic linear logic,
+even the first-order term synthesis becomes undecidable
+(as CFG equivalence is undecidable).
+That's pity, even in such restricted logic recursion
+makes problems very hard.
+On the other hand, we could add "lists" (Kleene Star),
+and then synthesis could still be possible,
+as ordinary regular expressions can be compared for equivalence.
+As a concrete example, we can ask whether
 
-At the very least, we can use the `RE` not only to match on strings,
-but also to generate ones. Therefore at least statistical testing
-is possible (not a new idea).
+$$
+A^\star \overset{?}{\longleftrightarrow} A^\star A^\star
+$$
+
+and the synthesis would produce an append (`++`) function for the other
+direction (and probably some trivial (`\xs -> ([], xs)` in other, thus *not* an
+isomorphism, yet preserving all the $A$s and keeping them in order).
+
+Also, we can use the recursive `RE` not only to match on strings,
+but also to generate ones. Therefore we can use
+it to statistically determine grammar equivalence (which is not a new idea).
 
 Finally, this is not only for fun.
 I'm trying to formalize the grammars of fields in `.cabal` files.
 The `parsec` parsers are **the definition**, but we could
-have a declarative definition
-- which can be visualized (in e.g $\text{\LaTeX}$),
-  i.e. more easily understandable by humans. `Parsec` instances
-  are getting history baggage, and also written to produce
-  helpful error messages.
-- and compared against:
-  - We can generate data using `Pretty` instance and parse using 
-    this framework, and the opposite direction
-  - We can use regexp to generate strings which should be
-    accepted by `Parsec` instance
-  - Or we can perturb the regexp to produce something else,
-    and check whether whether regexp matching and `parsec` parsing
-    agree.
-    For example inserting or removing white space, which is a mistake made more
-    than once in the grammars.
+have a declarative definition and compare these two statistically, i.e. using
+`QuickCheck`.
+
+The declarative definitin can be visualized (in e.g $\text{\LaTeX}$),
+to be reviewed by humans.
+Code in `Parsec` instances are getting history baggage, and also written to produce helpful error messages.
+However, we can compare it (and its companion `Pretty` instance)
+with `RE` counterpart to find possible inconsistencies.
+Also `RE`-derived generator can be amended to produce slightly skewed strings,
+for example inserting or removing white space. `Cabal` has history
+of not handling whitespace well, either always requiring, completely forbidding,
+or allowing where it shouldn't be allowed.
+
+TODO: I don't know if slowness of the parser will pose problem in testing,
+I hope it won't.
