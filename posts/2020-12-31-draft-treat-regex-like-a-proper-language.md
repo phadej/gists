@@ -80,14 +80,12 @@ $$
 \end{aligned}
 $$
 
-I omit rest of the rules, they are simple t
-
-
 The rules resemble the structure of *non-commutative intuitionistic linear logic*,
 if you are into such stuff.
 Not only you have to use everything exactly once, you have to use in order;
 there aren't any substructural rules, no weakening, no contraction
-and even no exchange.
+and even no exchange. I omit the rest of the rules, look them up
+(and think how rules for Kleene star would look like).
 
 It's wise to define smart versions of constructors,
 which would simplify regular expressions as they are created.
@@ -288,6 +286,8 @@ data RE a
 
 Now we can write regular expression like
 $\mathbf{let}\,{\color{blue}\mathit{r}}=\mathtt{\color{green!50!black}a}^\star\,\mathbf{in}\,{\color{blue}\mathit{r}}{\color{blue}\mathit{r}}$
+instead of
+$\mathtt{\color{green!50!black}a}^\star \mathtt{\color{green!50!black}a}^\star$:
 
 ```haskell
 ex2 :: RE Void
@@ -454,7 +454,7 @@ $$
 \end{aligned}
 $$
 
-As our smart constructors are quite smart, the "automaton" stays
+As our smart constructors are quite smart, the automaton stays
 in its single state, the union comes from the `derivative` of `App`,
 as `r` is nullable, we get `derivative 'a' r \/ derivative 'a' r <> r`.
 And as `derivative 'a' r = r`, we don't see additional `let` bindings.
@@ -742,25 +742,27 @@ exponentially, which is a good sign.
 I'm quite sure that Might, Darais, Spiewak approach is more efficient,
 but this one is elegantly pure.
 
-Conclusion and further work
----------------------------
+Conversion from context-free grammars
+-------------------------------------
 
-It was nice to combine known things in a new way, the result is interesting.
-
-There's interesting follow up questions, like:
-could all context-free languages be expressed in this framework?
+Could all context-free languages be expressed in this framework?
 Is there some algorithm to rewrite
 a usual context-free grammar into the formalism presented here?
-(I think yes, I can imagine an inductive algorithm removing non-terminal symbols
-at each iteration, converting them to $\mathbf{fix}$ or $\mathbf{let}$). 
+The answer is **yes**.
 
-```plain
-EXPR ::= MULT * EXPR | MULT
-MULT ::= TERM + MULT | TERM
-TERM ::= DIGIT | "(" EXPR ")"
-```
+For example the non-ambiguous grammar for arithmetic expressons
 
-in somewhat straight forward manner is convertible to:
+$$
+\begin{aligned}
+{\color{blue}\mathit{digit}} &= \mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3} \\
+{\color{blue}\mathit{digits}} &= {\color{blue}\mathit{digit}}\,{\color{blue}\mathit{digit}}^\star \\
+{\color{blue}\mathit{term}} &= {\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}}\mathtt{\color{green!50!black}\text{)}}  \\
+{\color{blue}\mathit{mult}} &= {\color{blue}\mathit{term}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}}\cup{\color{blue}\mathit{term}}  \\
+{\color{blue}\mathit{expr}} &= {\color{blue}\mathit{mult}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}} \\
+\end{aligned}
+$$
+
+in somewhat straight forward manner can be converted to:
 
 $$
 \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{digit}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{digits}}={\color{blue}\mathit{digit}}\,{\color{blue}\mathit{digit}}^\star\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{expr}}=\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{term}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{term}}\cup{\color{blue}\mathit{mult}}\end{aligned}\end{aligned}
@@ -770,15 +772,26 @@ And it works:
 
 $$
 \begin{aligned}
-& \mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{digit}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{digits}}={\color{blue}\mathit{digit}}{\color{blue}\mathit{digit}}^\star\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{expr}}=\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{term}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{term}}\cup{\color{blue}\mathit{mult}}\end{aligned}\end{aligned} \\
-&&& \vdots \\
-& \mathtt{\color{red!50!blue}\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{digit}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{digits}}={\color{blue}\mathit{digit}}{\color{blue}\mathit{digit}}^\star; \\ &{\color{blue}\mathit{digits}_{\mathtt{\color{red!50!blue}3}}}={\color{blue}\mathit{digit}}^\star; \\ &{\color{blue}\mathit{expr}}=\mathbf{fix}\,{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}=\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{term}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{term}}\cup{\color{blue}\mathit{mult}}\end{aligned}; \\ &{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}2}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}3}}={\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}3}}\cup{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}3}}}={\color{blue}\mathit{digits}_{\mathtt{\color{red!50!blue}3}}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}2}}\cup{\color{blue}\mathit{digits}_{\mathtt{\color{red!50!blue}3}}}; \\ &{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}20\text{+}3}}}={\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}3}}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}3}}}\\ \mathbf{in} & \,{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}20\text{+}3}}}\mathtt{\color{green!50!black}\text{)}}\end{aligned} \\
-&{\color{red!80!black}\varepsilon} &&\vdash {\color{red!80!black}\varepsilon} \\
+& \mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{digit}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{digits}}={\color{blue}\mathit{digit}}\,{\color{blue}\mathit{digit}}^\star\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{expr}}=\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{term}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}}\end{aligned}\end{aligned} \\
+&&& \;\vdots \\
+& \mathtt{\color{red!50!blue}\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{digit}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{digits}}={\color{blue}\mathit{digit}}\,{\color{blue}\mathit{digit}}^\star; \\ &{\color{blue}\mathit{digits}_{\mathtt{\color{red!50!blue}3}}}={\color{blue}\mathit{digit}}^\star; \\ &{\color{blue}\mathit{expr}}=\mathbf{fix}\,{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}=\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{term}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{mult}}\end{aligned}; \\ &{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}2}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}3}}={\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}3}}\cup{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}3}}}={\color{blue}\mathit{digits}_{\mathtt{\color{red!50!blue}3}}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}2}}\cup{\color{blue}\mathit{digits}_{\mathtt{\color{red!50!blue}3}}}; \\ &{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}20\text{+}3}}}={\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}3}}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}3}}}; \\ &{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}={\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}20\text{+}3}}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}={\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}2}}\cup{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\end{aligned} \\
+&{\color{red!80!black}\varepsilon} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{digit}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{digits}}={\color{blue}\mathit{digit}}\,{\color{blue}\mathit{digit}}^\star; \\ &{\color{blue}\mathit{expr}}=\mathbf{fix}\,{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}=\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{term}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{mult}}\end{aligned}; \\ &{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}2}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}3}}={\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}3}}\cup{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}=\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}2}}\cup{\color{red!80!black}\varepsilon}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\end{aligned} \\
 \end{aligned}
 $$
 
-but I cannot describe the procedure precisely.
+The conversion from context-free grammar to recursive regular expression
+relies on a simple observation: Context free grammars
+can be represented as fixpoint of $\mathsf{RE}^n \to \mathsf{RE}^n$ function,
+`letrec` with multiple variables. Using theorem by Bekić
+we can reduce it to a fixed point on of $\mathsf{RE} \to \mathsf{RE}$ function.
 
+**Theorem** (Bekić, [*Programming Languages and Their Definition*](https://dl.acm.org/doi/10.5555/1878))
+
+
+Conclusion and further work
+---------------------------
+
+It was nice to combine known things in a new way, the result is interesting.
 
 Another question is whether expressions in this format
 can be compared for an equivalence. If they can represent all CFGs,
