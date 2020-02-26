@@ -21,6 +21,7 @@ on reference equality. In short, not implementable in idiomatic Haskell. [^derp]
 
 There's a technique for a subset of context-free languages,
 which is in my opinion very elegant, and not painfully slow.
+The result is on Hackage: the [`rere`](http://hackage.haskell.org/package/rere) library.
 
 The idea is to treat regular expressions as a proper programming language,
 and add a constructions which proper languages should have:
@@ -52,6 +53,15 @@ data RE a
     | Alt RE RE
     | Star RE
 ```
+
+In the `rere` implementation, instead of bare `Char` we use a set of characters, `CharSet`,
+as recommented by Owens et al in
+[*Regular-expression derivatives reexamined*](https://dl.acm.org/doi/10.1017/S0956796808007090)
+([pdf](https://www.ccs.neu.edu/home/turon/re-deriv.pdf)).
+This makes implementation more efficient, as a common case of character
+sets is implicitly taken into account.
+We write them in curly braces:
+$\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}$.
 
 We can give *declarative* semantics to these constructors.
 These will look like typing rules.
@@ -85,7 +95,7 @@ if you are into such stuff.
 Not only you have to use everything exactly once, you have to use in order;
 there aren't any substructural rules, no weakening, no contraction
 and even no exchange. I omit the rest of the rules, look them up
-(and think how rules for Kleene star would look like).
+(and think how rules for Kleene star would look like TBW `!`).
 
 It's wise to define smart versions of constructors,
 which would simplify regular expressions as they are created.
@@ -94,7 +104,7 @@ i.e. `<>` is smart `App`:
 
 ```haskell
 instance Eq a => Semigroup (RE a) where
-    -- Null is annihilates
+    -- Null annihilates
     Null  <> _    = Null
     _     <> Null = Null
     -- Eps is unit of <>
@@ -105,7 +115,7 @@ instance Eq a => Semigroup (RE a) where
 ```
 
 We also define `\/` for smart `Alt`, and `star` for smart `Star`.
-We can check that these simplifications are sound, by using the 
+We can check that these simplifications are sound, by using the
 rules we have, for example `Eps <> r = r` equation is justified by:
 
 $$
@@ -121,21 +131,20 @@ $$
 
 If string $\color{red!50!blue}\Gamma$ is matched by
 ${\color{red!80!black}\varepsilon}{\color{blue}\mathit{r}}$,
-then it can be matched only in one way, by applying the $\textsc{App}$ rule.
-Therefore $\color{red!50!blue}\Gamma$ is also matched by bare ${\color{blue}\mathit{r}}$.
-If we'd introduce *proof terms*, we'll have a concrete evidence of the match
-as terms in this language.
+then "the match" can be constructor only in one way, by applying the
+$\textsc{App}$ rule.  Therefore $\color{red!50!blue}\Gamma$ is also matched by
+bare ${\color{blue}\mathit{r}}$.  If we'd introduce *proof terms*, we'll have a
+concrete evidence of the match as terms in this language.
 
-Matching using declarative rules is not practical: we have to guess.
-We have to guess whether we should pick left or right branch,
-or where we should split string to match concatenated regular expression.
-We need a *syntax directed* approach.
-The system consists only of two rules:
+There is a problem: matching using declarative rules is not practical: we have
+to guess.  We have to guess whether we should pick left or right branch, or
+where we should split string to match concatenated regular expression.  We need
+a *syntax directed* approach.  The system consists only of two rules:
 
 $$
 \begin{aligned}
 \prftree[r]{\textsc{Nullable}}%
-{{\color{blue}\mathit{r}} \text{ is nullable}} 
+{{\color{blue}\mathit{r}} \text{ is nullable}}
 {{\color{red!80!black}\varepsilon} \vdash {\color{blue}\mathit{r}}}
 &\qquad&
 \prftree[r]{\textsc{Derivative}}%
@@ -145,7 +154,8 @@ $$
 $$
 
 where we use to operations: decision procedure `nullable :: RE -> Bool`
-and mapping $D_c(r)$, `derivative :: Char -> RE -> RE`.
+and mapping $D_c(r)$, `derivative :: Char -> RE -> RE`; the lowercase
+$\color{red!50!blue}\gamma$ represents a single character.
 
 `nullable` tells whether the regular expression accepts an empty string,
 and is defined as a straight-forward recursive function:
@@ -248,7 +258,7 @@ $$
 $$
 
 where ${\color{blue}\mathit{s}}[{\color{blue}\mathit{x}} \to {\color{blue}\mathit{r}}]$
-is a notation for substitution.
+is a notation we use for substitution.
 
 To have let-expressions we need to represent *variables* and be
 able to perform substitution. My tool of choice for that
@@ -284,6 +294,11 @@ data RE a
     | Let (RE a) (RE (Var a))
 ```
 
+In `rere` library, `Let` (and further defined `Fix`) constructors
+Also have irrevant `Name` field, which allows to retain
+the names and uses them for pretty-printing.
+I omit them from the presentation in this blog post.
+
 Now we can write regular expression like
 $\mathbf{let}\,{\color{blue}\mathit{r}}=\mathtt{\color{green!50!black}a}^\star\,\mathbf{in}\,{\color{blue}\mathit{r}}{\color{blue}\mathit{r}}$
 instead of
@@ -291,10 +306,10 @@ $\mathtt{\color{green!50!black}a}^\star \mathtt{\color{green!50!black}a}^\star$:
 
 ```haskell
 ex2 :: RE Void
-ex2 = Let "r" (star (Ch 'a')) (Var B <> Var B)
+ex2 = Let (star (Ch 'a')) (Var B <> Var B)
 ```
 
-where `Void` tells that expression is *closed*, i.e. doesn't contain
+where `Void` tells us that expression is *closed*, i.e. doesn't contain
 free variables.
 
 We also need to extend `nullable` and `derivative` to work with new
@@ -354,7 +369,7 @@ The character `c` is bound by enclosing `derivative :: Char -> RE Void -> RE Voi
 derivative' :: (Eq a, Eq b) => (a -> (Bool, b, b)) -> RE a -> RE b
 ```
 
-The `derivative'` of variable is simple, look what is the context:
+The `derivative'` of variable is simple, just lookup in the context:
 
 ```haskell
 go f (Var a) = Var (sndOf3 (f a))
@@ -364,8 +379,8 @@ And `Let` is actually interesting:
 
 ```haskell
 derivative' f (Let r s)
-    = let_ (fmap (trdOf3 . f) r)
-    $ let_ (fmap F (derivative r')
+    = let_ (fmap (trdOf3 . f) r)       -- rename variables in r
+    $ let_ (fmap F (derivative' f r))  -- binding for derivative of r
     $ derivative' (\case
         B   -> (nullable' (fstOf3 . f) r,  Var B, F B)
         F x -> bimap (F . F) (F . F) (f x))
@@ -432,7 +447,7 @@ let x = a in f x x
 ```
 
 This form of CSE is easy and fast to implement, as
-we don't introduce new `let`s, only consider what we already bind
+we don't introduce new `let`s, only consider what we already bound
 and "try to increase sharing" so to speak.
 
 It's time for examples, recall `ex2` we defined as
@@ -462,8 +477,8 @@ And as `derivative 'a' r = r`, we don't see additional `let` bindings.
 Recursion
 ---------
 
-The thing we have waiting for: *recursion*. It's matter of adding
-one more constructor:
+Now we are ready for the main topic of the post: *recursion*.
+It's matter of adding one more constructor:
 
 ```haskell
 data RE a
@@ -492,7 +507,7 @@ $\mathbf{fix}\,{\color{blue}\mathit{x}}={\color{red!80!black}\varepsilon}\cup{\c
 which feels like a very natural definition indeed.
 For example `ex1` previously defined using Kleene star as $(\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b})^\star$ could also be re-defined as
 $\mathbf{fix}\,{\color{blue}\mathit{x}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}}$
-That looks like 
+That looks like
 
 ```haskell
 ex3 :: RE Void
@@ -501,7 +516,7 @@ ex3 = Fix "x" (Eps \/ Ch 'a' <> Ch 'b' <> Var B)
 
 in code.
 
-The problem is now: How to define `nullable` and `derivative`?
+The problem is now the same as with `Let`: How to define `nullable` and `derivative`?
 Luckily, we have most of machinery in place since we added `Var` and `Let`.
 
 Nullability of `Fix` relies on a Kleene's theorem to compute the
@@ -519,12 +534,25 @@ nullable' :: (a -> Bool) -> RE a -> Bool
 nullable' f (Fix _ r)   = nullable' (unvar False f) r
 ```
 
-in other words, we literally assume that the nullability of new binding
+In other words, we literally assume that the nullability of new binding
 is `False`, and see what comes out. We don't need to iterate
 more then once, as `False` will flip to `True` right away, or will
 never do so.
 
-The extension of `derivative` is again slightly more complicated, but not much.
+Similarly the the smart constructor `fix_`
+may recognise `Null` fixed-point by substuting `Null`:
+
+```haskell
+fix_ :: RE (Var a) -> RE a
+fix_ r | (r >>>= unvar Null Var) == Null = Null
+...
+```
+
+This works also as `Null` is a bottom of language-inclusion lattice
+(similarly as `False` is a bottom of a `Bool` lattice).
+
+The extension of `derivative` is again complicated,
+but at the end it resembles what happens with `Let`.
 
 As the body $r$ of fix point contains self references $x$,
 the derivative of fix point will also be a fix point,
@@ -552,19 +580,46 @@ where the $R$ subscript of equals sign indicates that binding is recursive.
 We avoid temptation of using $\mathbf{letrec}$ as in a cascade of $\mathbf{let}$ expressions,
 individual ones can be fixed points, but we still *cannot* forward reference.
 
-And in the code this looks very much like `Let`:
+The equation above looks then like
+
+$$
+D_c (\mathbf{fix}\,{\color{blue}\mathit{x}}={\color{blue}r}[{\color{blue}x}])
+= \begin{aligned}[t]
+\mathbf{let}\,&{\color{blue}\mathit{x}}=_R {\color{blue}r}[{\color{blue}x}] \\
+\mathbf{in}&\,
+\mathbf{fix}\,{\color{blue}\mathit{x}_c} = D_c({\color{blue}r}[{\color{blue}x}])
+\quad\text{where}\quad D_c({\color{blue}\mathit{x}}) = {\color{blue}\mathit{x_c}}
+\end{aligned}
+$$
+
+compare this to the let case, written slightly differently:
+
+$$
+D_c (\mathbf{let}\,{\color{blue}\mathit{x}}={\color{blue}r}\,\mathbf{in}\,{\color{blue}s})
+= \begin{aligned}[t]
+\mathbf{let}\,&{\color{blue}\mathit{x}}={\color{blue}r} \\
+\mathbf{in}&\,
+\mathbf{let}\,
+{\color{blue}\mathit{x_c}}=D_c({\color{blue}r})\,
+\mathbf{in}\,
+  D_c({\color{blue}s}) \quad\text{where}\quad D_c({\color{blue}\mathit{x}}) = {\color{blue}\mathit{x_c}}
+\end{aligned}
+$$
+
+And consequently, the implementation in Haskell looks also similar
+to the `Let` case:
 
 ```haskell
 derivative' f r0@(Fix r)
     = let_ (fmap (trdOf3 . f) r0)
-    $ Fix
+    $ fix_
     $ derivative' (\case
         B   -> (nullable' (fstOf3 . f) r0, B, F B)
         F x -> bimap (F . F) (F . F) (f x))
     $ r
 ```
 
-Let's see how it works. The same example as we did with `ex1` executes nicely:
+Let's see how it works. The same example as we did with `ex1`, matching `abab`, executes nicely:
 
 $$
 \begin{aligned}
@@ -591,7 +646,7 @@ Probably the simplest non-regular language is some amount of $a$ followed
 by the *same* amount of $b$s:
 
 $$
-L = \{ a^n b^n | n \in \mathbb{N} \}
+L = \{ a^n b^n \mid n \in \mathbb{N} \}
 $$
 
 We can describe that language using our library, thanks to fix point:
@@ -630,7 +685,7 @@ be recognized.
 
 <h3>Left recursion</h3>
 
-In the first example we rewrote 
+In the first example we rewrote
 $(\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b})^\star$ as
 $\mathbf{fix}\,{\color{blue}\mathit{x}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}\mathtt{\color{green!50!black}b}{\color{blue}\mathit{x}}$,
 but we can also rewrite
@@ -664,7 +719,7 @@ Another go to example of context free grammars is arithmetic
 expressions. We'll have only digits 0 to 4, for simplicity:
 
 $$
-\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{d}}=\{{\color{green!50!black}0} \cdots {\color{green!50!black}9}\}; \\ &{\color{blue}\mathit{n}}={\color{blue}\mathit{d}}\,{\color{blue}\mathit{d}}^\star\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}}=\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\end{aligned}
+\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{d}}=\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}; \\ &{\color{blue}\mathit{n}}={\color{blue}\mathit{d}}\,{\color{blue}\mathit{d}}^\star\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}}=\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\end{aligned}
 $$
 
 The Haskell variant is not even too obfuscated (though de Bruijn indices start to cause slight inconvenience):
@@ -673,7 +728,7 @@ The Haskell variant is not even too obfuscated (though de Bruijn indices start t
 ex6 :: RE Void
 ex6 = Let (Ch '0' \/ Ch '1' \/ Ch '2' \/ Ch '4')
     $ Let (Var B <> star (Var B))
-    $ Fix 
+    $ Fix
     $  Ch '(' <> Var B <> Ch ')'
     \/ Var (F B)
     \/ Var B <> Ch '+' <> Var B
@@ -684,64 +739,22 @@ And the trace of matching `1*(20+3)` is
 
 $$
 \begin{aligned}
-& \mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{d}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{n}}={\color{blue}\mathit{d}}{\color{blue}\mathit{d}}^\star\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}}=\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{e}}\mathtt{\color{green!50!black}\text{)}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}\end{aligned} \\
-& \mathtt{\color{red!50!blue}\text{*}\text{(}20\text{+}3\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{d}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{n}}={\color{blue}\mathit{d}}{\color{blue}\mathit{d}}^\star; \\ &{\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}1}}}={\color{blue}\mathit{d}}^\star; \\ &{\color{blue}\mathit{e}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}=\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{)}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1}}}={\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}1}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1}}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1}}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}\end{aligned} \\
+& \mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{d}}=\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}; \\ &{\color{blue}\mathit{n}}={\color{blue}\mathit{d}}\,{\color{blue}\mathit{d}}^\star\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}}=\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\end{aligned} \\
+& \mathtt{\color{red!50!blue}\text{*}\text{(}20\text{+}3\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{n}}=\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}1}}}=\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{e}}=_R\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1}}}={\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}1}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\end{aligned} \\
 &&& \vdots \\
-& \mathtt{\color{red!50!blue}\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{d}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{n}}={\color{blue}\mathit{d}}{\color{blue}\mathit{d}}^\star; \\ &{\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}3}}}={\color{blue}\mathit{d}}^\star; \\ &{\color{blue}\mathit{e}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}=\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{)}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3}}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3};1}}={\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}3}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3};1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3};1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3}}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3};1}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3};1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3};1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3};1}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3}}}\mathtt{\color{green!50!black}\text{)}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3};1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3};1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3}}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3}}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3}}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}\end{aligned} \\
-&{\color{red!80!black}\varepsilon} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{d}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{n}}={\color{blue}\mathit{d}}{\color{blue}\mathit{d}}^\star; \\ &{\color{blue}\mathit{e}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}=\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{)}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3\text{)}}}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3\text{)}};1}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3\text{)}};1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3\text{)}};1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3\text{)}}}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3\text{)}};1}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3\text{)}}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3\text{)}};1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3\text{)}};1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}};1}}={\color{red!80!black}\varepsilon}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3\text{)}}}}\mathtt{\color{green!50!black}\text{)}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}};1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}};1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}}}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}}}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}}}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}\end{aligned} \\
+& \mathtt{\color{red!50!blue}3\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{n}}=\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{e}}=_R\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}}}}=_R{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}}}}=_R{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}}}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}}}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\end{aligned} \\
+& \mathtt{\color{red!50!blue}\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{n}}=\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}3}}}=\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{e}}=_R\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3}}}=_R{\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}3}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3}}}=_R{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}=_R{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3}}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\end{aligned} \\
+&{\color{red!80!black}\varepsilon} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{n}}=\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{e}}=_R\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}=_R{\color{red!80!black}\varepsilon}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}}}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\end{aligned} \\
 \end{aligned}
 $$
 
-$$
-\begin{aligned}
-& \mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{d}}=\{{\color{green!50!black}0} \cdots {\color{green!50!black}9}\}; \\ &{\color{blue}\mathit{n}}={\color{blue}\mathit{d}}\,{\color{blue}\mathit{d}}^\star\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}}=\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\end{aligned} \\
-& \mathtt{\color{red!50!blue}\text{*}\text{(}20\text{+}3\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{n}}=\{{\color{green!50!black}0} \cdots {\color{green!50!black}9}\}\{{\color{green!50!black}0} \cdots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}1}}}=\{{\color{green!50!black}0} \cdots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{e}}=\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1}}}={\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}1}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\end{aligned} \\
-&&& \vdots \\
-& \mathtt{\color{red!50!blue}3\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{n}}=\{{\color{green!50!black}0} \cdots {\color{green!50!black}9}\}\{{\color{green!50!black}0} \cdots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{e}}=\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}}}}={\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}}}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}}}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}}}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\end{aligned} \\
-& \mathtt{\color{red!50!blue}\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{n}}=\{{\color{green!50!black}0} \cdots {\color{green!50!black}9}\}\{{\color{green!50!black}0} \cdots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}3}}}=\{{\color{green!50!black}0} \cdots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{e}}=\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3}}}={\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}3}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3}}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3}}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\end{aligned} \\
-&{\color{red!80!black}\varepsilon} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{n}}=\{{\color{green!50!black}0} \cdots {\color{green!50!black}9}\}\{{\color{green!50!black}0} \cdots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{e}}=\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{)}}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}={\color{red!80!black}\varepsilon}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}}}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{e}}\end{aligned} \\
-\end{aligned}
-$$
 
 The final state is nullable:
 one alternative of the final fix point is ${\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}$
-which itself is nullable because it contains ${\color{red!80!black}\varepsilon}$.
+which itself is nullable because it's an union with ${\color{red!80!black}\varepsilon}$.
 
 The other two alternatives are "continuations" starting with `+` or `*`,
 as the arithmetic expression could indeed continue starting with them.
-
-Also one could notice that ${\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3\text{)}}}} =\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3\text{)}};1}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3\text{)}};1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3\text{)}};1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}$
-is in fact ${\color{red!80!black}\emptyset}$, but our constructors aren't sufficiently smart to recognize that case:
-With fix points it's easy to write a null expression, which is not syntactically obviously null.
-
-One idea, which I'm not sure is correct is to substitute `Null`:
-If there's anything else an expression could match that by Kleene's theorem one should get not `Null`. *Maybe*.
-This is a small addition to smart constructor `fix_`:
-
-```haskell
-fix_ :: Ord a => RE (Var a) -> RE a
-fix_ r
-    | Just r' <- unused r
-    = r'
-    -- here: substitute Null and see what pop-out:
-    | (r >>>= unvar Null Var) == Null
-    = Null
-fix_ r = Fix r
-
-
-```
-
-Then the example above becomes a bit more compact:
-
-$$
-\begin{aligned}
-& \mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{d}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{n}}={\color{blue}\mathit{d}}{\color{blue}\mathit{d}}^\star\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}}=\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{e}}\mathtt{\color{green!50!black}\text{)}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}\end{aligned} \\
-& \mathtt{\color{red!50!blue}\text{*}\text{(}20\text{+}3\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{d}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{n}}={\color{blue}\mathit{d}}{\color{blue}\mathit{d}}^\star; \\ &{\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}1}}}={\color{blue}\mathit{d}}^\star; \\ &{\color{blue}\mathit{e}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}=\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{)}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1}}}={\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}1}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1}}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1}}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}\end{aligned} \\
-&&& \vdots \\
-& \mathtt{\color{red!50!blue}\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{d}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{n}}={\color{blue}\mathit{d}}{\color{blue}\mathit{d}}^\star; \\ &{\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}3}}}={\color{blue}\mathit{d}}^\star; \\ &{\color{blue}\mathit{e}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}=\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{)}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3}}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3};1}}={\color{blue}\mathit{n}_{\mathtt{\color{red!50!blue}3}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3};1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3};1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3}}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3};1}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}3}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3};1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3};1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3};1}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}20\text{+}3}}}\mathtt{\color{green!50!black}\text{)}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3};1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3};1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3}}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3}}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3}}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}\end{aligned} \\
-&{\color{red!80!black}\varepsilon} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{d}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{n}}={\color{blue}\mathit{d}}{\color{blue}\mathit{d}}^\star; \\ &{\color{blue}\mathit{e}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}=\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{)}}\cup{\color{blue}\mathit{n}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}}1}}; \\ &{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}=\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}};1}}={\color{red!80!black}\varepsilon}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}};1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}};1}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}}}}={\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}}}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{e}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\cup{\color{blue}\mathit{e}_{\mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}}}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{e}}\end{aligned} \\
-\end{aligned}
-$$
 
 Conversion from context-free grammars
 -------------------------------------
@@ -751,32 +764,32 @@ Is there some algorithm to rewrite
 a usual context-free grammar into the formalism presented here?
 The answer is **yes**.
 
-For example the non-ambiguous grammar for arithmetic expressons
+For example the non-ambiguous grammar for arithmetic expressions
 
 $$
 \begin{aligned}
-{\color{blue}\mathit{digit}} &= \mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3} \\
+{\color{blue}\mathit{digit}} &= \{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\} \\
 {\color{blue}\mathit{digits}} &= {\color{blue}\mathit{digit}}\,{\color{blue}\mathit{digit}}^\star \\
-{\color{blue}\mathit{term}} &= {\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}}\mathtt{\color{green!50!black}\text{)}}  \\
-{\color{blue}\mathit{mult}} &= {\color{blue}\mathit{term}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}}\cup{\color{blue}\mathit{term}}  \\
-{\color{blue}\mathit{expr}} &= {\color{blue}\mathit{mult}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}} \\
+{\color{blue}\mathit{term}} &= {\color{blue}\mathit{digits}}\cup\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{expr}}\mathtt{{\color{green!50!black}\text{)}}} \\
+{\color{blue}\mathit{mult}} &= {\color{blue}\mathit{term}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{mult}}\cup{\color{blue}\mathit{term}} \\
+{\color{blue}\mathit{expr}} &= {\color{blue}\mathit{mult}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}} \\
 \end{aligned}
 $$
 
-in somewhat straight forward manner can be converted to:
+can be converted to recursive regular expression
 
 $$
-\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{digit}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{digits}}={\color{blue}\mathit{digit}}\,{\color{blue}\mathit{digit}}^\star\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{expr}}=\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{term}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{term}}\cup{\color{blue}\mathit{mult}}\end{aligned}\end{aligned}
+\mathbf{let}\,{\color{blue}\mathit{digits}}=\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}^\star\,\mathbf{in}\,\mathbf{fix}\,{\color{blue}\mathit{expr}}=\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{expr}}\mathtt{{\color{green!50!black}\text{)}}}; \\ &{\color{blue}\mathit{mult}}=_R{\color{blue}\mathit{term}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{mult}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}}\end{aligned}
 $$
 
-And it works:
+And it works, it's fascinating to see how state-expression evolves:
 
 $$
 \begin{aligned}
-& \mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{digit}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{digits}}={\color{blue}\mathit{digit}}\,{\color{blue}\mathit{digit}}^\star\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{expr}}=\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{term}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}}\end{aligned}\end{aligned} \\
+& \mathtt{\color{red!50!blue}1\text{*}\text{(}20\text{+}3\text{)}} &&\vdash \mathbf{let}\,{\color{blue}\mathit{digits}}=\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}^\star\,\mathbf{in}\,\mathbf{fix}\,{\color{blue}\mathit{expr}}=\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{expr}}\mathtt{{\color{green!50!black}\text{)}}}; \\ &{\color{blue}\mathit{mult}}=_R{\color{blue}\mathit{term}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{mult}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}}\end{aligned} \\
 &&& \;\vdots \\
-& \mathtt{\color{red!50!blue}\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{digit}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{digits}}={\color{blue}\mathit{digit}}\,{\color{blue}\mathit{digit}}^\star; \\ &{\color{blue}\mathit{digits}_{\mathtt{\color{red!50!blue}3}}}={\color{blue}\mathit{digit}}^\star; \\ &{\color{blue}\mathit{expr}}=\mathbf{fix}\,{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}=\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{term}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{mult}}\end{aligned}; \\ &{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}2}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}3}}={\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}3}}\cup{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}3}}}={\color{blue}\mathit{digits}_{\mathtt{\color{red!50!blue}3}}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}2}}\cup{\color{blue}\mathit{digits}_{\mathtt{\color{red!50!blue}3}}}; \\ &{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}20\text{+}3}}}={\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}3}}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}3}}}; \\ &{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}={\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}20\text{+}3}}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}={\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}2}}\cup{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\end{aligned} \\
-&{\color{red!80!black}\varepsilon} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{digit}}=\mathtt{\color{green!50!black}0}\cup\mathtt{\color{green!50!black}1}\cup\mathtt{\color{green!50!black}2}\cup\mathtt{\color{green!50!black}3}; \\ &{\color{blue}\mathit{digits}}={\color{blue}\mathit{digit}}\,{\color{blue}\mathit{digit}}^\star; \\ &{\color{blue}\mathit{expr}}=\mathbf{fix}\,{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}=\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{term}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{mult}}\end{aligned}; \\ &{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{digits}}\cup\mathtt{\color{green!50!black}\text{(}}{\color{blue}\mathit{expr}}\mathtt{\color{green!50!black}\text{)}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}2}}=\mathbf{fix}\,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}3}}={\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}3}}\cup{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}=\mathtt{\color{green!50!black}\text{+}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}2}}\cup{\color{red!80!black}\varepsilon}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\mathtt{\color{green!50!black}\text{*}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\end{aligned} \\
+& \mathtt{\color{red!50!blue}\text{)}} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{digits}}=\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{digits}_{\mathtt{\color{red!50!blue}3}}}=\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{expr}}=_R\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{expr}}\mathtt{{\color{green!50!black}\text{)}}}; \\ &{\color{blue}\mathit{mult}}=_R{\color{blue}\mathit{term}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{mult}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}}\end{aligned}; \\ &{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{digits}}\cup\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{expr}}\mathtt{{\color{green!50!black}\text{)}}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}=_R{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}3}}}={\color{blue}\mathit{digits}_{\mathtt{\color{red!50!blue}3}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{digits}_{\mathtt{\color{red!50!blue}3}}}; \\ &{\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}20\text{+}3}}}={\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}3}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}3}}}; \\ &{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}={\color{blue}\mathit{expr}_{\mathtt{\color{red!50!blue}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{)}}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}={\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3}}}\end{aligned} \\
+&{\color{red!80!black}\varepsilon} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{digits}}=\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}\{{\color{green!50!black}0} \ldots {\color{green!50!black}9}\}^\star; \\ &{\color{blue}\mathit{expr}}=_R\begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{term}}={\color{blue}\mathit{digits}}\cup\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{expr}}\mathtt{{\color{green!50!black}\text{)}}}; \\ &{\color{blue}\mathit{mult}}=_R{\color{blue}\mathit{term}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{mult}}\cup{\color{blue}\mathit{term}}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}}\end{aligned}; \\ &{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}={\color{blue}\mathit{digits}}\cup\mathtt{{\color{green!50!black}\text{(}}}{\color{blue}\mathit{expr}}\mathtt{{\color{green!50!black}\text{)}}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}=_R{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{blue}\mathit{term}_{\mathtt{\color{red!50!blue}}1}}; \\ &{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}=\mathtt{{\color{green!50!black}\text{+}}}{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}}1}}\cup{\color{red!80!black}\varepsilon}\\ \mathbf{in} & \,{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\mathtt{{\color{green!50!black}\text{*}}}{\color{blue}\mathit{expr}}\cup{\color{blue}\mathit{mult}_{\mathtt{\color{red!50!blue}\text{(}20\text{+}3\text{)}}}}\end{aligned} \\
 \end{aligned}
 $$
 
@@ -820,14 +833,14 @@ h_m \bar{y} = \begin{aligned}[t]
 \mathbf{let}\, &x_0 = \mathbf{fix}\,x = f(x, \bar{y}) \\
 \mathbf{in}\,& g(x_0, \bar{y})
 \end{aligned}
-$$ 
+$$
 
 where $\bar{y}$ means $m$ distinct $\mathsf{RE}$ variables.
 
 Using this equation we can iterate top-level production removal,
 until we reach the single production base case.
 
-A short note on performance
+Note on performance
 ---------------------------
 
 The note is short, because I haven't really measured anything.
@@ -844,22 +857,119 @@ ex7parsec = expr where
     mult   = void $ P.try (term >> P.char '+' >> mult) <|> term
     term   = P.try digits <|> void (P.char '(' *> expr *> P.char ')')
     digits = void $ some digit
-    digit  = P.char '0'
-         <|> P.char '1'
-         <|> P.char '2'
-         <|> P.char '3'
+    digit  = P.satisfy (\c -> c >= '0' && c <= '9')
 ```
 
-Note, that it only *recognises*, i.e. doesn't build a parse tree,
-but also uses `try`. This makes the comparison a bit more fair.
+Note, that it only *recognises*, i.e. doesn't build a parse tree.
+I also didn't used *good practices* in writing `parsec` parsers,
+rather translating the CFG as directly as possible.
 
 The result is salty. The recursive-regexp approach is
 1000-10000 times slower (and getting slower the longer the input string is).
 Not really surprising, as the matching algorithm recomputes
 a lot of things on each character, but still unfortunate.
 
+We can get 100x speedup (but be still 100x slower than `parsec`)
+by introducing explicit sharing instead of `Fix` (and `Let`).
+At the end doing the same as Might, Darais and Spiewak;
+with a difference that our public interface is non-opaque.
+
+We take the original regular expression we started with,
+and add a new constructor `Ref`:
+
+```haskell
+-- | Knot-tied recursive regular expression.
+data RR
+    = Eps
+    | Ch CS.CharSet
+    | App RR RR
+    | Alt RR RR
+    | Star RR
+    | Ref !Int RR
+```
+
+This structure can now be circular, as long as we as cycles use
+`Ref`. Conversion from `RE` with `Fix` is direct mapping of constructors,
+the intersting part happens with `Fix`, we have to use `mfix`
+(and a lazy state monad):
+
+```haskell
+    go :: RE RR -> State Int RR
+    go (R.Fix _ r) = mfix $ \res -> do
+        i <- newId
+        r' <- go (fmap (unvar res id) r)
+        return (Ref i r')
+```
+
+The result is still simple and not non-acceptably slow.
+In fact, if speed is required one can fallback to nasty `derp` implementation,
+as in my simple benchmark it seemed to be quite fast!
+The benefit of `rere` is having a non-opaque inspectable
+representation, it's good to know that we can go fast if needed.
+
+```
+benchmarking parsec
+time                 22.31 μs   (21.44 μs .. 23.66 μs)
+
+benchmarking rere
+time                 237.2 ms   (207.5 ms .. 266.1 ms)
+
+benchmarking ref
+time                 6.029 ms   (5.486 ms .. 6.801 ms)
+
+benchmarking derp
+time                 20.31 μs   (18.37 μs .. 22.07 μs)
+```
+
 Intersection
 ------------
+
+We know that regular expressions are closed under intersection,
+and it's possible to convert from `RE` with `And` constructor
+to `RE` without one. Context-free grammaras are not closed under intersection,
+but our recursive `RE` can still be extended with additional `And` constructor,
+and all the above will continue to work.
+
+```haskell
+data RE a =
+    ...
+    | And (RE a) (RE a)
+```
+
+We can also add `Full` constructor which would match everything.
+
+The extension of `nullable` and `derivative` is so simple,
+you may think something will break, yet nothing does:
+
+```haskell
+nullable' Full      = True
+nullable' (And r s) = nullable' r && nullable' s
+
+derivative' _ Full      = Full
+derivative' f (And r s) = derivative' f r /\ derivative' f s
+
+(/\) :: Ord a => RE a -> RE a -> RE a
+...
+r /\ s = And r s
+```
+
+The example is a intersection of two languages:
+
+$$
+\begin{aligned}
+X &= \{ a^n b^n c^m \mid n, m \in \mathbb{N} \}
+&
+Y &= \{ a^m b^n c^n \mid n, m \in \mathbb{N} \}
+\end{aligned}
+$$
+
+which is known to be non context-free:
+
+$$
+L = X \cap Y = \{ a^n b^n c^n \mid n \in \mathbb{N} \}
+$$
+
+However, we can simply match with it:
 
 $$
 \begin{aligned}
@@ -876,20 +986,39 @@ $$
 \end{aligned}
 $$
 
+This is of course slightly cheating, as we have `And` / $\cap$ as outer constructor,
+not inside `Fix` / $\mathbf{fix}$. But even then it doesn't pose
+problems for the algorithm, coming up with meaningful examples is.
+One can also remember that we interpret $\mathbf{fix}$ as a lowest fixed point,
+so for example even
+
 $$
-\begin{aligned}
-& \mathtt{\color{red!50!blue}aabbccaabbcc} &&\vdash \mathbf{fix}\,{\color{blue}\mathit{abc}}={\color{red!80!black}\varepsilon}\cup(\mathtt{\color{green!50!black}a}^\star(\mathbf{fix}\,{\color{blue}\mathit{bc}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}b}{\color{blue}\mathit{bc}}\mathtt{\color{green!50!black}c})\cap(\mathbf{fix}\,{\color{blue}\mathit{ab}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}{\color{blue}\mathit{ab}}\mathtt{\color{green!50!black}b})\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}} \\
-&&& \vdots \\
-& \mathtt{\color{red!50!blue}caabbcc} &&\vdash \mathbf{let}\,{\color{blue}\mathit{abc}}=_R{\color{red!80!black}\varepsilon}\cup(\mathtt{\color{green!50!black}a}^\star(\mathbf{fix}\,{\color{blue}\mathit{bc}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}b}{\color{blue}\mathit{bc}}\mathtt{\color{green!50!black}c})\cap(\mathbf{fix}\,{\color{blue}\mathit{ab}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}{\color{blue}\mathit{ab}}\mathtt{\color{green!50!black}b})\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}}\,\mathbf{in}\,\mathbf{fix}\,{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbc}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbc}}}\cup(\mathtt{\color{green!50!black}c}\cap\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}} \\
-& \mathtt{\color{red!50!blue}aabbcc} &&\vdash \mathbf{let}\,{\color{blue}\mathit{abc}}=_R{\color{red!80!black}\varepsilon}\cup(\mathtt{\color{green!50!black}a}^\star(\mathbf{fix}\,{\color{blue}\mathit{bc}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}b}{\color{blue}\mathit{bc}}\mathtt{\color{green!50!black}c})\cap(\mathbf{fix}\,{\color{blue}\mathit{ab}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}{\color{blue}\mathit{ab}}\mathtt{\color{green!50!black}b})\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}}\,\mathbf{in}\,\mathbf{fix}\,{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbcc}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbcc}}}\cup{\color{blue}\mathit{abc}} \\
-& \mathtt{\color{red!50!blue}abbcc} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{abc}}=_R{\color{red!80!black}\varepsilon}\cup(\mathtt{\color{green!50!black}a}^\star(\mathbf{fix}\,{\color{blue}\mathit{bc}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}b}{\color{blue}\mathit{bc}}\mathtt{\color{green!50!black}c})\cap(\mathbf{fix}\,{\color{blue}\mathit{ab}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}{\color{blue}\mathit{ab}}\mathtt{\color{green!50!black}b})\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}}; \\ &{\color{blue}\mathit{ab}_{\mathtt{\color{red!50!blue}}1}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}{\color{blue}\mathit{ab}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}b}; \\ &{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}a}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}a}}}\cup(\mathtt{\color{green!50!black}a}^\star(\mathbf{fix}\,{\color{blue}\mathit{bc}_{\mathtt{\color{red!50!blue}}1}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}b}{\color{blue}\mathit{bc}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}c})\cap{\color{blue}\mathit{ab}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}b}\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbcca}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbcca}}}\cup{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}a}}}\end{aligned} \\
-& \mathtt{\color{red!50!blue}bbcc} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{abc}}=_R{\color{red!80!black}\varepsilon}\cup(\mathtt{\color{green!50!black}a}^\star(\mathbf{fix}\,{\color{blue}\mathit{bc}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}b}{\color{blue}\mathit{bc}}\mathtt{\color{green!50!black}c})\cap(\mathbf{fix}\,{\color{blue}\mathit{ab}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}{\color{blue}\mathit{ab}}\mathtt{\color{green!50!black}b})\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}}; \\ &{\color{blue}\mathit{ab}_{\mathtt{\color{red!50!blue}}1}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}{\color{blue}\mathit{ab}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}b}; \\ &{\color{blue}\mathit{ab}_{\mathtt{\color{red!50!blue}a}}}={\color{blue}\mathit{ab}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}b}; \\ &{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aa}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aa}}}\cup(\mathtt{\color{green!50!black}a}^\star(\mathbf{fix}\,{\color{blue}\mathit{bc}_{\mathtt{\color{red!50!blue}}1}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}b}{\color{blue}\mathit{bc}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}c})\cap{\color{blue}\mathit{ab}_{\mathtt{\color{red!50!blue}a}}}\mathtt{\color{green!50!black}b}\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbccaa}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbccaa}}}\cup{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aa}}}\end{aligned} \\
-& \mathtt{\color{red!50!blue}bcc} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{abc}}=_R{\color{red!80!black}\varepsilon}\cup(\mathtt{\color{green!50!black}a}^\star(\mathbf{fix}\,{\color{blue}\mathit{bc}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}b}{\color{blue}\mathit{bc}}\mathtt{\color{green!50!black}c})\cap(\mathbf{fix}\,{\color{blue}\mathit{ab}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}{\color{blue}\mathit{ab}}\mathtt{\color{green!50!black}b})\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}}; \\ &{\color{blue}\mathit{bc}_{\mathtt{\color{red!50!blue}}1}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}b}{\color{blue}\mathit{bc}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}c}; \\ &{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aab}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aab}}}\cup({\color{blue}\mathit{bc}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}c}\cap\mathtt{\color{green!50!black}b}\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbccaab}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbccaab}}}\cup{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aab}}}\end{aligned} \\
-& \mathtt{\color{red!50!blue}cc} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{abc}}=_R{\color{red!80!black}\varepsilon}\cup(\mathtt{\color{green!50!black}a}^\star(\mathbf{fix}\,{\color{blue}\mathit{bc}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}b}{\color{blue}\mathit{bc}}\mathtt{\color{green!50!black}c})\cap(\mathbf{fix}\,{\color{blue}\mathit{ab}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}{\color{blue}\mathit{ab}}\mathtt{\color{green!50!black}b})\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}}; \\ &{\color{blue}\mathit{bc}_{\mathtt{\color{red!50!blue}}1}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}b}{\color{blue}\mathit{bc}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}c}; \\ &{\color{blue}\mathit{bc}_{\mathtt{\color{red!50!blue}b}}}={\color{blue}\mathit{bc}_{\mathtt{\color{red!50!blue}}1}}\mathtt{\color{green!50!black}c}; \\ &{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabb}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabb}}}\cup({\color{blue}\mathit{bc}_{\mathtt{\color{red!50!blue}b}}}\mathtt{\color{green!50!black}c}\cap\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbccaabb}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbccaabb}}}\cup{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabb}}}\end{aligned} \\
-& \mathtt{\color{red!50!blue}c} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{abc}}=_R{\color{red!80!black}\varepsilon}\cup(\mathtt{\color{green!50!black}a}^\star(\mathbf{fix}\,{\color{blue}\mathit{bc}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}b}{\color{blue}\mathit{bc}}\mathtt{\color{green!50!black}c})\cap(\mathbf{fix}\,{\color{blue}\mathit{ab}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}{\color{blue}\mathit{ab}}\mathtt{\color{green!50!black}b})\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}}; \\ &{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbc}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbc}}}\cup(\mathtt{\color{green!50!black}c}\cap\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbccaabbc}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbccaabbc}}}\cup{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbc}}}\end{aligned} \\
-&{\color{red!80!black}\varepsilon} &&\vdash \begin{aligned}[t] \mathbf{let}& \,{\color{blue}\mathit{abc}}=_R{\color{red!80!black}\varepsilon}\cup(\mathtt{\color{green!50!black}a}^\star(\mathbf{fix}\,{\color{blue}\mathit{bc}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}b}{\color{blue}\mathit{bc}}\mathtt{\color{green!50!black}c})\cap(\mathbf{fix}\,{\color{blue}\mathit{ab}}={\color{red!80!black}\varepsilon}\cup\mathtt{\color{green!50!black}a}{\color{blue}\mathit{ab}}\mathtt{\color{green!50!black}b})\mathtt{\color{green!50!black}c}^\star){\color{blue}\mathit{abc}}; \\ &{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbcc}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbcc}}}\cup{\color{blue}\mathit{abc}}\\ \mathbf{in} & \,\mathbf{fix}\,{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbccaabbcc}}}={\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbccaabbcc}}}\cup{\color{blue}\mathit{abc}_{\mathtt{\color{red!50!blue}aabbcc}}}\end{aligned} \\
-\end{aligned}
+\mathbf{fix}\,{\color{blue}x} = {\color{blue}x} \cap {\color{red!80!black}\varepsilon}
 $$
+
+has ${\color{red!80!black}\varepsilon}$ as a fixed point, the
+${\color{red!80!black}\emptyset}$ is also a fixed point and is the lowest one.
+Therefore the above expression works (and indeed is automatically simplified to)
+${\color{red!80!black}\emptyset}$.
+
+However `And` / $\cap$ adds expressive power to the language, so it cannot be
+admitted as in pure regular expressions (where it causes combinatorial
+explosion of expression size, so not always a good idea either).
+
+There's one clear trouble with `And` however: languages defined using
+`And` cannot be easily generated. We can use first branch to generate
+the candidate, but it must also match the second branch.
+I don't know whether "is language empty" problem is decidable (for CFGs it is).
+Consider simple regular expressions, strings of $a$ of odd and even length:
+
+$$
+\mathit{odd} = a(aa)^\star
+\qquad\text{and}\qquad
+\mathit{even} = (aa)^\star
+$$
+
+Their intersection is empty, but it's not structurally obvious.
+$\mathbf{fix}$ makes the problem even more tricky.
 
 Conclusion
 ----------
@@ -924,9 +1053,44 @@ I'm trying to formalize the grammars of fields in `.cabal` files.
 The `parsec` parsers are **the definition**, but we could
 have a declarative definition and compare these two statistically, i.e. using
 `QuickCheck`.
+As a side effect we get nice looking $\text{\LaTeX}$ (hopefully) human-readable grammar definitions.
+If you ever wondered which is full and precise syntax for version ranges in `.cabal` files, here is what it could look like:
 
-The declarative definitin can be visualized (in e.g $\text{\LaTeX}$),
-to be reviewed by humans.
+$$
+\begin{aligned}
+\mathit{version} &=
+{\left\{ \mathop{\mathord{``}\mathtt{0}\mathord{"}}\mid[\mathop{\mathord{``}\mathtt{1}\mathord{"}}\cdots\mathop{\mathord{``}\mathtt{9}\mathord{"}}]{[\mathop{\mathord{``}\mathtt{0}\mathord{"}}\cdots\mathop{\mathord{``}\mathtt{9}\mathord{"}}]}^{\in [0\ldots8]}_{} \right\}}^+_{\mathop{\mathord{``}\mathtt{\text{.}}\mathord{"}}}
+\\
+\mathit{version\text{-}range} &=
+\mathbf{fix}\;\mathop{\mathit{version\text{-}range}}\;\mathbf{in}\;\left\{
+\begin{gathered}\mathop{\mathord{``}\mathtt{\text{-}any}\mathord{"}}\\
+\mathop{\mathord{``}\mathtt{\text{-}none}\mathord{"}}\\
+\mathop{\mathord{``}\mathtt{\text{=}\text{=}}\mathord{"}}\circ\mathop{\mathit{version}}\\
+\mathop{\mathord{``}\mathtt{\text{>}}\mathord{"}}\circ\mathop{\mathit{version}}\\
+\mathop{\mathord{``}\mathtt{\text{<}}\mathord{"}}\circ\mathop{\mathit{version}}\\
+\mathop{\mathord{``}\mathtt{\text{<}\text{=}}\mathord{"}}\circ\mathop{\mathit{version}}\\
+\mathop{\mathord{``}\mathtt{\text{>}\text{=}}\mathord{"}}\circ\mathop{\mathit{version}}\\
+\mathop{\mathord{``}\mathtt{\text{\textasciicircum}\text{>}\text{=}}\mathord{"}}\circ\mathop{\mathit{version}}\\
+\mathop{\mathit{version\text{-}range}}\circ\mathop{\mathord{``}\mathtt{\text{|}\text{|}}\mathord{"}}\circ\mathop{\mathit{version\text{-}range}}\\
+\mathop{\mathit{version\text{-}range}}\circ\mathop{\mathord{``}\mathtt{\text{\&}\text{\&}}\mathord{"}}\circ\mathop{\mathit{version\text{-}range}}\\
+\mathop{\mathord{``}\mathtt{\text{(}}\mathord{"}}\circ\mathop{\mathit{version\text{-}range}}\circ\mathop{\mathord{``}\mathtt{\text{)}}\mathord{"}}\\
+\mathop{\mathord{``}\mathtt{\text{=}\text{=}}\mathord{"}}\circ{\left\{ \mathop{\mathord{``}\mathtt{0}\mathord{"}}\mid[\mathop{\mathord{``}\mathtt{1}\mathord{"}}\cdots\mathop{\mathord{``}\mathtt{9}\mathord{"}}]{[\mathop{\mathord{``}\mathtt{0}\mathord{"}}\cdots\mathop{\mathord{``}\mathtt{9}\mathord{"}}]}^{\in [0\ldots8]}_{} \right\}}^+_{\mathop{\mathord{``}\mathtt{\text{.}}\mathord{"}}}\mathop{\mathord{``}\mathtt{\text{.}\text{*}}\mathord{"}}\\
+\mathop{\mathord{``}\mathtt{\text{=}\text{=}}\mathord{"}}\circ\mathop{\mathord{``}\mathtt{\{}\mathord{"}}\circ{\mathop{\mathit{version}}}^+_{\left(\circ\mathop{\mathord{``}\mathtt{\text{,}}\mathord{"}}\circ\right)}\circ\mathop{\mathord{``}\mathtt{\}}\mathord{"}}\\
+\mathop{\mathord{``}\mathtt{\text{\textasciicircum}\text{>}\text{=}}\mathord{"}}\circ\mathop{\mathord{``}\mathtt{\{}\mathord{"}}\circ{\mathop{\mathit{version}}}^+_{\left(\circ\mathop{\mathord{``}\mathtt{\text{,}}\mathord{"}}\circ\right)}\circ\mathop{\mathord{``}\mathtt{\}}\mathord{"}}
+\end{gathered}
+\right\}
+\end{aligned}
+$$
+
+The notation is a bit obscure for uninitiated,
+tuned to express concisely the particularities of `.cabal` grammars.
+Short summary of main features are:
+
+- terminals are enclosed in quotes $\mathord{``}\mathtt{abc}\mathord{"}$
+- $\circ$ means any amount of white space,
+- subscripts in the repetions syntax stand for used separators,
+- and unions are enclosed in curly braces.
+
 Code in `Parsec` instances are getting history baggage, and also written to produce helpful error messages.
 However, we can compare it (and its companion `Pretty` instance)
 with `RE` counterpart to find possible inconsistencies.
@@ -934,6 +1098,3 @@ Also `RE`-derived generator can be amended to produce slightly skewed strings,
 for example inserting or removing white space. `Cabal` has history
 of not handling whitespace well, either always requiring, completely forbidding,
 or allowing where it shouldn't be allowed.
-
-TODO: I don't know if slowness of the parser will pose problem in testing,
-I hope it won't.
