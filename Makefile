@@ -1,7 +1,7 @@
 PDFS := Squash ColorsInLhs2TeX
 
 all : images pdfs
-	cabal new-build gists:site
+	cabal v2-build gists:site
 	`cabal-plan list-bin site` rebuild
 	@echo file://`pwd`/_site/index.html
 
@@ -16,14 +16,14 @@ images :
 	cp images-static/*.svg images
 
 repl:
-	cabal new-repl gists-runnable:lib:gists-literate
+	cabal v2-repl gists-runnable:lib:gists-literate
 
 watch :
-	cabal new-build gists:site
+	cabal v2-build gists:site
 	`cabal-plan list-bin site` watch
 
 clean :
-	cabal new-build gists:site
+	cabal v2-build gists:site
 	`cabal-plan list-bin site` clean
 
 upload : all

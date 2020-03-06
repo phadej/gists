@@ -1,18 +1,9 @@
-index-state: 2018-03-31T09:27:33Z
-with-compiler: ghc-8.2.2
+index-state:   2020-03-06T12:27:11Z
+with-compiler: ghc-8.6.5
 
 packages:
     "."
     pkg/gists-runnable.cabal
 
 constraints:
-  hakyll +previewServer,
-  conduit-extra >=1.2.3.2
-
-allow-newer:
-  *:http-types,
-  boring:adjunctions,
-  latex-formulae-hakyll:hakyll,
-  latex-formulae-hakyll:base,
-  latex-formulae-image:base,
-  latex-formulae-image:process
+  hakyll +previewServer

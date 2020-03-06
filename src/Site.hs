@@ -34,7 +34,7 @@ feedConfiguration = FeedConfiguration
     , feedDescription = "Haskell related gists"
     , feedAuthorName  = "Oleg Grenrus"
     , feedAuthorEmail = "oleg.grenrus@iki.fi"
-    , feedRoot        = "http://oleg.fi/gists"
+    , feedRoot        = "https://oleg.fi/gists"
     }
 
 -------------------------------------------------------------------------------
@@ -42,7 +42,7 @@ feedConfiguration = FeedConfiguration
 -------------------------------------------------------------------------------
 
 main :: IO ()
-main = LaTeX.initFormulaCompilerDataURI 1000 environmentOptions >>= main'
+main = LaTeX.initFormulaCompilerSVG 1000 environmentOptions >>= main'
 
 main' :: (LaTeX.PandocFormulaOptions -> Pandoc -> Compiler Pandoc) -> IO ()
 main' renderFormulae = do
@@ -142,24 +142,24 @@ postsPattern = fromRegex "^posts/.*\\.(md|lhs|tex)$"
 
 environmentOptions :: LaTeX.EnvironmentOptions
 environmentOptions = LaTeX.defaultEnv
-    { LaTeX.imageMagickArgs = [] -- ["-unsharp", "0.5x0.5+0.5"]
+    { LaTeX.dvisvgmArgs = "--zoom=1.1" : LaTeX.dvisvgmArgs LaTeX.defaultEnv
+    , LaTeX.globalCache = True
     }
 
 pandocFormulaOptions :: LaTeX.PandocFormulaOptions
 pandocFormulaOptions = def
     { LaTeX.formulaOptions = fopts
-    , LaTeX.shrinkBy       = 2
     }
   where
     def = LaTeX.defaultPandocFormulaOptions
     fopts mt = (LaTeX.formulaOptions def mt)
-        { LaTeX.preamble = concat
+        { LaTeX.preamble = unlines
             [ "\\usepackage[T1]{fontenc}"
             , "\\usepackage{amsmath}"
             , "\\usepackage{amssymb}"
             , "\\usepackage{amsthm}"
-            , "\\usepackage{amsfonts}"
             , "\\usepackage{stmaryrd}"
+            , "\\usepackage{palatino}"
             , "\\usepackage{mathpazo}"
             , "\\usepackage{mathtools}"
             , "\\usepackage{prftree}"
@@ -168,7 +168,6 @@ pandocFormulaOptions = def
             -- with leftovers
             , "\\newcommand{\\RightarrowLabel}[1]{\\xRightarrow{\\displaystyle\\;#1\\;\\;}}"
             ]
-        , LaTeX.dpi = 200
         }
 
 -------------------------------------------------------------------------------
@@ -178,7 +177,8 @@ pandocFormulaOptions = def
 writerOpts :: Syntax ->  PO.WriterOptions
 writerOpts cabalSyntax = PO.def
     { PO.writerHighlightStyle = Just PH.pygments -- kate
-    , PO.writerSyntaxMap      = Map.insert "cabal" cabalSyntax $ PO.writerSyntaxMap PO.def
+    , PO.writerSyntaxMap      = Map.insert "cabal" cabalSyntax
+                              $ PO.writerSyntaxMap PO.def
     -- , PO.writerHtml5 = True
     }
 

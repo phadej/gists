@@ -47,7 +47,7 @@ library
   build-depends:      gists-literate
   build-depends:
     , adjunctions
-    , base                  ^>=4.10
+    , base                  ^>=4.12
     , boring
     , constraints
     , containers
@@ -61,7 +61,6 @@ library
     , free
     , generic-lens
     , generics-sop
-    , ghc-proofs            ^>=0.1.1
     , HUnit
     , invariant
     , kan-extensions
@@ -95,7 +94,7 @@ library gists-literate
     Squash
 
   build-depends:
-    , base         ^>=4.10.1
+    , base         ^>=4.12
     , boring
     , constraints
     , containers
