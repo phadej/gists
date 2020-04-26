@@ -142,8 +142,8 @@ postsPattern = fromRegex "^posts/.*\\.(md|lhs|tex)$"
 
 environmentOptions :: LaTeX.EnvironmentOptions
 environmentOptions = LaTeX.defaultEnv
-    { LaTeX.dvisvgmArgs = "--zoom=1.1" : LaTeX.dvisvgmArgs LaTeX.defaultEnv
-    , LaTeX.globalCache = True
+    { LaTeX.globalCache   = True
+    , LaTeX.latexFontSize = 14
     }
 
 pandocFormulaOptions :: LaTeX.PandocFormulaOptions
@@ -163,6 +163,7 @@ pandocFormulaOptions = def
             , "\\usepackage{mathpazo}"
             , "\\usepackage{mathtools}"
             , "\\usepackage{prftree}"
+            , "\\usepackage{tikz-cd}"
             -- proofs (find-right-laws)
             , "\\newcommand{\\equivvia}[1]{\\equiv\\!\\!\\langle\\ #1\\ \\rangle}"
             -- with leftovers
@@ -190,6 +191,7 @@ readerOpts = PO.def
         & PO.enableExtension PO.Ext_tex_math_dollars
         & PO.enableExtension PO.Ext_literate_haskell
         & PO.enableExtension PO.Ext_footnotes
+        & PO.enableExtension PO.Ext_raw_tex
     }
 
 pandocTransform :: Pandoc -> Pandoc

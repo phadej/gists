@@ -22,9 +22,9 @@ executable site
     , base-compat       ^>=0.11.1
     , containers
     , hakyll            ^>=4.13.0.0
-    , latex-svg-hakyll  ^>=0.1
-    , latex-svg-image   ^>=0.1
-    , latex-svg-pandoc  ^>=0.1
+    , latex-svg-hakyll  ^>=0.2
+    , latex-svg-image   ^>=0.2
+    , latex-svg-pandoc  ^>=0.2
     , lens
     , mtl
     , pandoc            ^>=2.7.3
