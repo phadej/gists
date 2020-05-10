@@ -1,4 +1,4 @@
-PDFS := Squash ColorsInLhs2TeX
+PDFS := Squash ColorsInLhs2TeX LatexSVG
 
 all : images pdfs
 	cabal v2-build gists:site

@@ -1,0 +1,1 @@
+../../posts/2020-05-10-latex-svg.tex

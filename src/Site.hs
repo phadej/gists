@@ -8,8 +8,9 @@ import Control.Lens hiding (Context)
 import Control.Monad (when)
 import Control.Monad.State.Strict (State, runState)
 import Data.List (isPrefixOf)
-import Text.Pandoc (Pandoc, Block (..))
-import Text.Pandoc.Walk (walk)
+import Data.Semigroup (Min (..))
+import Text.Pandoc (Pandoc, Block (..), Inline (..))
+import Text.Pandoc.Walk (walk, query)
 import Skylighting (Syntax, parseSyntaxDefinition)
 
 import Hakyll
@@ -85,6 +86,8 @@ main' renderFormulae = do
         let compiler
                 = pandocCompilerWithTransformM readerOpts (writerOpts cabalSyntax)
                 $ renderFormulae pandocFormulaOptions
+                . reduceHeaders
+                . adjustImageFolder
                 . pandocTransform
         compile $ compiler
             >>= loadAndApplyTemplate "templates/post.html"    (postCtxWithTags tags)
@@ -212,6 +215,32 @@ postCtx =
 
 postCtxWithTags :: Tags -> Context String
 postCtxWithTags tags = tagsField "tags" tags `mappend` postCtx
+
+-------------------------------------------------------------------------------
+-- reduce headers & adjust images path
+-------------------------------------------------------------------------------
+
+reduceHeaders :: Pandoc -> Pandoc
+reduceHeaders pndc = g pndc where
+    l = case query f pndc of
+        Just (Min x) -> x
+        Nothing      -> 2
+
+    f (Header i _ _) = Just (Min i)
+    f _              = Nothing
+
+    g | l == 1    = walk $ \b -> case b of
+        Header j attr xs -> Header (succ j) attr xs
+        _                -> b
+      | otherwise = id
+
+adjustImageFolder :: Pandoc -> Pandoc
+adjustImageFolder = walk $ \i -> case i of
+    Image attr xs (url, title)
+        | "http" `isPrefixOf` url       -> i
+        | "../images/" `isPrefixOf` url -> i
+        | otherwise                     -> Image attr xs ("../images/" <> url, title)
+    _ -> i
 
 -------------------------------------------------------------------------------
 -- TOC and other post-processing

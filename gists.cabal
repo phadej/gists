@@ -24,13 +24,14 @@ executable site
     , hakyll            ^>=4.13.0.0
     , latex-svg-hakyll  ^>=0.2
     , latex-svg-image   ^>=0.2
-    , latex-svg-pandoc  ^>=0.2
+    , latex-svg-pandoc  ^>=0.2.1
     , lens
     , mtl
     , pandoc            ^>=2.7.3
     , pandoc-types      ^>=1.17.6.1
     , skylighting       ^>=0.8.3.2
     , tagsoup
+    , text
 
 source-repository head
   type:     git

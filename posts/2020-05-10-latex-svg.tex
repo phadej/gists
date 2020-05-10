@@ -1,0 +1,71 @@
+\input{../preamble.tex}
+%include polycode.fmt
+
+\begin{document}
+I'm a weird person.
+I like writing $\text{\LaTeX}$. With all of its downsides, it's quite flexible.
+
+This blog post is written in \texttt{tex} file, not markdown.
+With the help of \href{https://oleg.fi/gists/posts/2020-03-06-latex-svg.html}{\texttt{latex-svg}},
+the included math and some \emph{other} environments work.
+We are still constrained by what pandoc supports, but there is a lot.
+
+\section{Examples}
+
+Let us write few examples of what we can do.
+
+\subsection{Math}
+
+Formulas
+
+\begin{equation*}
+\sin^2 \theta + \cos^2 \theta = 1
+\end{equation*}
+
+or
+
+\begin{align*}
+\sin' &= \cos \\
+\cos' &= - \sin
+\end{align*}
+
+work nicely.
+
+\subsection{tikzcd}
+
+As \texttt{pandoc} can preserve raw latex blocks and \texttt{latex-svg}
+renders them, you can draw \texttt{tikzcd} diagrams:
+
+\begin{tikzcd}
+A \arrow[r,"f"] & B
+\end{tikzcd}
+
+\subsection{Tables}
+
+Writing tables in markdown is a pain. It is painful in $\text{\LaTeX}$ also but less.
+
+\begin{tabular}{lcr}
+foo & bar & quu \\
+\hline
+foo1 & 2345678 & quu9 \\
+foo123 & 456 & quu789
+\end{tabular}
+
+\subsection{Code snippets}
+
+\texttt{pandoc} recognizes \texttt{code} environment. So we get code highlighting!
+
+\begin{code}
+fact :: Integer -> Integer
+fact n = product [2 .. n]
+\end{code}
+
+\section{Rendering as PDF}
+
+The benefit of writing posts in $\text{\LaTeX}$ is that you can convert to PDF.
+You can also start with markdown, and use pandoc to convert it to tex document,
+and that is what more reasonable people do.
+
+\includegraphics{LatexSVG.png}
+
+\end{document}
