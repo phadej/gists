@@ -1,6 +1,7 @@
 ---
 title: "overloaded-0.2.1: Overloaded:Categories"
 author: Oleg Grenrus
+tags: overloaded
 ---
 
 The `Overloaded:Categories` is another of the new features of 

@@ -1,6 +1,7 @@
 ---
 title: "overloaded-0.2.1: Overloaded:Do"
 author: Oleg Grenrus
+tags: overloaded
 ---
 
 The `Overloaded:Do` is one of the new features of
