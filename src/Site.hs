@@ -171,6 +171,9 @@ pandocFormulaOptions = def
             , "\\newcommand{\\equivvia}[1]{\\equiv\\!\\!\\langle\\ #1\\ \\rangle}"
             -- with leftovers
             , "\\newcommand{\\RightarrowLabel}[1]{\\xRightarrow{\\displaystyle\\;#1\\;\\;}}"
+            , "\\setlength{\\prfinterspace}{1.5em}"
+            , "\\setlength{\\prfrulenameskip}{0.3em}"
+            , "\\setlength{\\prflinethickness}{.4pt}"
             ]
         }
 
