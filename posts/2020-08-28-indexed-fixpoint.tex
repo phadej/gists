@@ -1,0 +1,450 @@
+\section{Introduction}
+
+I was lately thinking about fixed points, more or less.
+
+A new version of 
+\href{https://hackage.haskell.org/package/data-fix}{\texttt{data-fix}}
+was released recently, and also corresponding version
+of \href{https://hackage.haskell.org/package/recursion-schemes}{\texttt{recursion-schemes}}.
+
+Also I wrote a \href{https://www.well-typed.com/blog/2020/06/fix-ing-regular-expressions/}{Fix-ing regular expressions} post,
+about adding fixed points to regular expression.
+
+This post is another exploration: \emph{Fixed points of Indexed functors}.
+This is not novel idea at all,
+but I'm positively surprised this works out quite nicely in modern GHC Haskell.
+I define a |IxFix| type and illustrate it with three examples.
+
+In the following, the "modern GHC Haskell" is quite conservative,
+only eight extensions:
+
+\begin{code}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
+\end{code}
+
+And this literate Haskell script is warning free, with \texttt{-Wall}
+\begin{code}
+{-# OPTIONS_GHC -Wall #-}
+\end{code}
+
+On this trip
+\begin{code}
+module IxFix where
+\end{code}
+
+we need a handful of imports
+
+\begin{code}
+-- Type should be added to Prelude
+import Data.Kind (Type)
+
+-- Few newtypes
+import Data.Functor.Identity (Identity (..))
+import Data.Functor.Compose (Compose (..))
+import Data.Functor.Const (Const (..))
+
+-- dependently typed programming!
+import Data.Fin      (Fin)
+import Data.Type.Nat
+import Data.Vec.Lazy (Vec (..))
+
+-- magic
+import Data.Coerce (coerce)
+\end{code}
+
+Before we go further, let me remind you about ordinary fixed points,
+as defined in 
+\href{https://hackage.haskell.org/package/data-fix}{\texttt{data-fix}}
+package.
+
+\begin{code}
+newtype Fix f = Fix { unFix :: f (Fix f) }
+
+foldFix :: Functor f => (f a -> a) -> Fix f -> a
+foldFix f = go where go = f . fmap go . unFix
+\end{code}
+
+Using |Fix| we can define recursive types using non-recursive \emph{base functors},
+e.g. for a list we'd have
+
+\begin{code}
+data ListF a rec = NilF | ConsF a rec
+\end{code}
+
+We then use |foldFix| (or |cata| and other recursion schemes in \texttt{recursion-schemes}) to 
+decouple "how we recurse" and "what we do at each step".
+I won't try to convince you why this separation of concerns might be useful.
+
+Instead I continue directly to the topic: define indexed fixed points.
+Why we need them? Because |Fix| is not powerful enough to allow
+working with |Vec| or polymorphically recursive types.
+
+\begin{code}
+-- hello dependently typed world.
+data Vec (n :: Nat) (a :: Type) where
+    VNil  :: Vec 'Z a
+    (:::) :: a -> Vec n a -> Vec ('S n) a
+\end{code}
+
+\section{Fixed points of indexed functors}
+
+Before talking about fixed points, we need to figure out what
+are indexed functors. Recall a normal functor
+is a thing of kind |Type -> Type|:
+
+\begin{code}
+class Functor f where
+    fmap :: (a -> b) -> (f a -> f b)
+\end{code}
+
+Indexed version is the one with |Type| replaced with |k -> Type|,
+for some index |k| (it is still a functor, but in different category).
+We want morphisms to work for all indices,
+and preserve them. Thus we define a commonly used type alias\footnote{I'm sorry that tilde |~>| and dash |->| arrows look so similar.}
+\begin{code}
+-- natural, or parametric, transformation
+type f ~> g = forall (j :: k). f j -> g j
+\end{code}
+Using it we can define a |Functor| variant\footnote{
+Note that |FFunctor| in \url{https://hackage.haskell.org/package/hkd-0.1/docs/Data-HKD.html} (which is defined with different names in other packages as well)
+is of different kind.
+|IxFunctor| in \url{https://hackage.haskell.org/package/indexed-0.1.3/docs/Data-Functor-Indexed.html}
+is again different.
+Sorry for proliferation of various functors.
+And for confusing terminology. 
+Dominic Orchard et al uses terms graded (|k -> Type|, this post) and parameterised (|k -> k -> Type|, \texttt{indexed}-package) in \url{https://arxiv.org/abs/2001.10274v2}.
+There is no monad-name for \texttt{hkd}-package variant, as that cannot be made into monad-like thing.
+}:
+it looks almost the same.
+\begin{code}
+class IxFunctor (f :: (k -> Type) -> (k -> Type)) where
+    ixmap :: (a ~> b) -> (f a ~> f b)
+\end{code}
+
+With |IxFunctor| in our toolbox, we can define an |IxFix|,
+note how the definition is again almost the same as for unindexed |Fix| and |foldFix|:
+\begin{code}
+newtype IxFix f i = IxFix { unIxFix :: f (IxFix f) i }
+
+foldIxFix :: IxFunctor f => (f g ~> g) -> IxFix f ~> g
+foldIxFix alg = alg . ixmap (foldIxFix alg) . unIxFix
+\end{code}
+
+Does this work?
+I hope that following examples will convince that |IxFix|
+is usable (at least in theory).
+
+\section{Example: length indexed lists, Vec}
+
+The go to example of recursion schemes is a folding a list,
+The go to example of dependent types is length indexed list, often called |Vec|.
+I combine these traditions by defining |Vec| as an indexed fixed point:
+
+\begin{code}
+data VecF (a :: Type) rec (n :: Nat) where
+    NilF  ::               VecF a rec 'Z
+    ConsF :: a -> rec n -> VecF a rec ('S n)
+\end{code}
+
+|VecF| is an |IxFunctor|:
+
+\begin{code}
+instance IxFunctor (VecF a) where
+    ixmap _ NilF         = NilF
+    ixmap f (ConsF x xs) = ConsF x (f xs)
+\end{code}
+
+And we can define |Vec| as fixed point of |VecF|, with constructors:
+
+\begin{code}
+type Vec' a n = IxFix (VecF a) n
+
+nil :: Vec' a 'Z
+nil = IxFix NilF
+
+cons :: a -> Vec' a n -> Vec' a ('S n)
+cons x xs = IxFix (ConsF x xs)
+\end{code}
+
+Can we actually use it? Of course!
+Lets define concatenation\footnote{You may wonder why function name is |append|, but operation is concatenation? This is similar to having |plus| for addition.}
+|Vec' a n -> Vec' a m -> Vec' a (Plus n m)|.
+We cannot use |foldIxFix| directly, as |Plus n m| is not the same
+index as |n|, so we need to define an auxiliary |newtype|
+to plumb the indices. Another way to think about these kind of |newtype|s,
+is that they work around the lack of type-level anonymous functions in nowadays Haskell.
+
+\begin{code}
+newtype Appended m a n =
+    Append { getAppended :: Vec' a m -> Vec' a (Plus n m) }
+\end{code}
+
+\begin{code}
+append :: forall a n m. Vec' a n -> Vec' a m -> Vec' a (Plus n m)
+append xs ys = getAppended (foldIxFix alg xs) ys where
+    alg :: VecF a (Appended m a) j -> Appended m a j
+    alg NilF          = Append id
+    alg (ConsF x rec) = Append $ \zs -> cons x (getAppended rec zs)
+\end{code}
+
+We can also define a refold function, which doesn't mention
+|IxFix| at all.
+
+\begin{code}
+ixrefold :: IxFunctor f => (f b ~> b) -> (a ~> f a) -> a ~> b
+ixrefold f g = f . ixmap (ixrefold f g) . g
+\end{code}
+
+And then, using |ixrefold| we can define concatenation for |Vec| from
+\href{https://hackage.haskell.org/package/vec}{\texttt{vec}} package,
+which isn't defined using |IxFix|.
+Here we need auxiliary |newtype|s as well.
+
+\begin{code}
+newtype Swapped f a b =
+    Swap { getSwapped :: f b a }
+newtype Appended2 m a n =
+    Append2 { getAppended2  :: Vec m a -> Vec (Plus n m) a }
+
+append2 :: forall a n m. Vec n a -> Vec m a -> Vec (Plus n m) a
+append2 xs ys = getAppended2 (ixrefold f g (Swap xs)) ys where
+    -- same as alg in 'append'
+    f :: VecF a (Appended2 m a) j -> Appended2 m a j
+    f NilF          = Append2 id
+    f (ConsF z rec) = Append2 $ \zs -> z :::  (getAppended2 rec zs)
+
+    -- 'project'
+    g :: Swapped Vec a j -> VecF a (Swapped Vec a) j
+    g (Swap VNil)       = NilF
+    g (Swap (z ::: zs)) = ConsF z (Swap zs)
+\end{code}
+
+You may note that one can implement |append| as induction over length,
+that's how |vec| implements them.
+Theoretically it is not right, and |IxFix| formulation highlights it:
+
+\begin{code}
+append3 :: forall a n m. SNatI n
+        => Vec' a n -> Vec' a m -> Vec' a (Plus n m)
+append3 xs ys = getAppended3 (induction caseZ caseS) xs where
+    caseZ :: Appended3 m a 'Z
+    caseZ = Append3 (\_ -> ys)
+
+    caseS :: Appended3 m a p -> Appended3 m a ('S p)
+    caseS rec = Append3 $ \(IxFix (ConsF z zs)) ->
+        cons z (getAppended3 rec zs)
+
+-- Note: this is different than Appended!
+newtype Appended3 m a n =
+    Append3 { getAppended3 :: Vec' a n -> Vec' a (Plus n m) }
+\end{code}
+
+Here we \emph{pattern match} on |IxFix| value.
+If we want to treat it as least fixed point, the only valid elimination
+is to use |foldIxFix|!
+
+However, the induction over length is the right approach if |Vec| is defined
+as a data or type family:
+
+\begin{code}
+type family VecFam (a :: Type) (n :: Nat) :: Type where
+    VecFam a 'Z     = ()
+    VecFam a ('S n) = (a, VecFam a n)
+\end{code}
+
+Whether you want to have data or type-family or GADT depends on the application.
+(Even in Agda or Coq). Family variant doesn't intristically know its length,
+which is sometimes a blessing, sometimes a curse.
+For what it's worth, \texttt{vec} package provides both variants,
+with almost the same module interface.
+
+\section{Example: Polymorphically recursive type}
+
+The |IxFix| can also be used to define polymorphically recursive types like
+
+\begin{code}
+data Nested a = a :<: (Nested [a]) | Epsilon
+infixr 5 :<:
+
+nested :: Nested Int
+nested = 1 :<: [2,3,4] :<: [[5,6],[7],[8,9]] :<: Epsilon
+\end{code}
+
+A length function defined over this datatype will be polymorphically recursive,
+as the type of the argument changes from Nested a to Nested [a] in the recursive call:
+
+\begin{code}
+-- >>> nestedLength nested
+-- 3
+nestedLength :: Nested a -> Int
+nestedLength Epsilon    = 0
+nestedLength (_ :<: xs) = 1 + nestedLength xs
+\end{code}
+
+We cannot represent |Nested| as |Fix| of some functor,
+and we can not use \texttt{recursion-schemes} either.
+However, we can redefine |Nested| as indexed fixed point.
+
+An important observation is that we (often or always?) use polymorphic recursion
+as a solution to the lack indexed types.
+My favorite example is de Bruijn indices for well-scoped terms.
+Compare
+\begin{code}
+data Expr1 a
+    = Var1 a
+    | App1 (Expr1 a) (Expr1 a)
+    | Abs1 (Expr1 (Maybe a))
+\end{code}
+and
+\begin{code}
+data Expr2 a n
+    = Free2 a                -- split free and bound variables
+    | Bound2 (Fin n)
+    | App2 (Expr2 a n) (Expr2 a n)
+    | Abs2 (Expr2 a ('S n))  -- extend bound context by one
+\end{code}
+Which one is \emph{simpler} is a really good discussion,
+but for the another time.
+
+In |Nested| example the single argument is also used for two
+purposes: the type of an base element (|Int|) and container type
+(starts with |Identity| and increases with extra list layer).
+
+One approach is just use |Nat| index and have a type family%
+\footnote{Here one starts to wish that GHC had unsaturated type families, so we wouldn't need to use newtypes...}
+\begin{code}
+type family Container (n :: Nat) :: Type -> Type where
+    Container 'Z     = Identity
+    Container ('S n) = Compose [] (Container n)
+\end{code}
+
+or
+
+\begin{code}
+data NestedF a rec f
+    = f a :<<: rec (Compose [] f)
+    | EpsilonF
+
+instance IxFunctor (NestedF a) where
+    ixmap _ EpsilonF    = EpsilonF
+    ixmap f (x :<<: xs) = x :<<: f xs
+\end{code}
+
+We can convert from |Nested a| to |IxFix (NestedF a) Identity| and back.
+We use |coerce| to help with |newtype| plumbing.
+
+\begin{code}
+convert :: Nested a -> IxFix (NestedF a) Identity
+convert = aux . coerce where
+    aux :: Nested (f a) -> IxFix (NestedF a) f
+    aux Epsilon    = IxFix EpsilonF
+    aux (x :<: xs) = IxFix (x :<<: aux (coerce xs))
+
+-- back left as an exercise
+\end{code}
+
+And then we can write |nestedLength| as a fold.
+
+\begin{code}
+-- >>> nestedLength2 (convert nested)
+-- 3
+nestedLength2 :: IxFix (NestedF a) f -> Int
+nestedLength2 = getConst . foldIxFix alg where
+    alg :: NestedF a (Const Int) ~> Const Int
+    alg EpsilonF         = Const 0
+    alg (_ :<<: Const n) = Const (n + 1)
+\end{code}
+
+\section{Non-example: ListF}
+
+In the introduction I mentioned an ordinary list, which is a fixed point
+
+\begin{align*}
+  \mathsf{List} \coloneqq \lambda (A : \mathsf{Type}).\; \mu (r : \mathsf{Type}).\; 1 + A \times r
+\end{align*}
+
+where I use $\mu (r : X).\, F\, r$ notation to represent least fixed points:
+$\mu (r : X). F\, r \cong F\, (\mu (r : X). F\, r)$.
+Note that we first introduce a type parameter $A$ with $\lambda$, and then make
+a fixed point with $\mu$.
+
+We can define an ordirinary list using |IxFix|,
+by taking a fixed point of a |Type -> Type| thing,
+i.e. first $\mu$, and then $\lambda$.
+
+\begin{align*}
+  \mathsf{List}_1 \coloneqq \mu (r : \mathsf{Type} \to \mathsf{Type}).\; \lambda (A : \mathsf{Type}).\; 1 + A \times r\,A
+\end{align*}
+
+\begin{code}
+data ListF1 rec a = NilF1 | ConsF1 a (rec a)
+type List1 = IxFix ListF1
+
+fromList1 :: [a] -> List1 a
+fromList1 []     = IxFix NilF1
+fromList1 (x:xs) = IxFix (ConsF1 x (fromList1 xs))
+\end{code}
+
+Compare to Agda code:
+
+\begin{code}
+-- parameter
+data List (A : Set) : Set where
+    nil  : List A
+    cons : A -> List A -> List A
+
+-- index
+data List : Set -> Set where
+    nil :  (A : Set) -> List A
+    cons : (A : Set) -> A -> List A -> List A
+\end{code}
+
+These types are subtly different.
+See \url{https://stackoverflow.com/questions/24600256/difference-between-type-parameters-and-indices}.
+
+This gives a hint why |Agda| people define |Vec (A : Set) : Nat -> Set|,
+i.e. length as the last parameter: because you have to do that way.
+And Haskellers (usually) define as |Vec (n :: Nat) (a :: Type)|,
+because then |Vec| can be given |Functor| etc instances.
+In other words, machinery in both languages forces an order of
+of type arguments.
+
+Finally, we can write parametric version of |List| using
+|IxFix| too. We just use a dummy, boring index.
+
+\begin{align*}
+  \mathsf{List} \coloneqq
+  \lambda (A : \mathsf{Type}).\;
+  \mu (r : 1 \to \mathsf{Type}).\;
+  \lambda (x : 1).\;
+  1 + A \times r\,x
+\end{align*}
+
+\begin{code}
+data ListF2 a rec (unused :: ()) = NilF2 | ConsF2 a (rec unused)
+type List2 a = IxFix (ListF2 a) '()
+
+fromList2 :: [a] -> List2 a
+fromList2 []     = IxFix NilF2
+fromList2 (x:xs) = IxFix (ConsF2 x (fromList2 xs))
+\end{code}
+
+|IxFix| is more general than |Fix|, but if you don't need
+an extra power, maybe you shouldn't use it.
+
+Do we need something even more powerful than |IxFix|?
+I don't think so. If we need more (dependent) indices, we can pack them all into
+a single index by tupling (or $\sum$-mming) them.
+
+\section{Conclusion}
+
+We have seen |IxFix|, fixed point of indexed functor.
+I honestly do not think that you should start looking in your code base whether you can use it.
+I suspect it is more useful as thinking and experimentation tool.
+It is an interesting gadget.
