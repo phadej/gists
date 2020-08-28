@@ -15,6 +15,10 @@ This is not novel idea at all,
 but I'm positively surprised this works out quite nicely in modern GHC Haskell.
 I define a |IxFix| type and illustrate it with three examples.
 
+\emph{Note:} The
+\href{https://hackage.haskell.org/package/multirec-0.7.9/docs/Generics-MultiRec-HFix.html}{|HFix| in \texttt{multirec} package} is the same as |IxFix|
+in this post. I always forget about the existence of \texttt{multirec}.
+
 In the following, the "modern GHC Haskell" is quite conservative,
 only eight extensions:
 
@@ -310,7 +314,7 @@ data Expr2 a n
     | Abs2 (Expr2 a ('S n))  -- extend bound context by one
 \end{code}
 Which one is \emph{simpler} is a really good discussion,
-but for the another time.
+but for another time.
 
 In |Nested| example the single argument is also used for two
 purposes: the type of an base element (|Int|) and container type
@@ -419,7 +423,7 @@ Finally, we can write parametric version of |List| using
 |IxFix| too. We just use a dummy, boring index.
 
 \begin{align*}
-  \mathsf{List} \coloneqq
+  \mathsf{List}_2 \coloneqq
   \lambda (A : \mathsf{Type}).\;
   \mu (r : 1 \to \mathsf{Type}).\;
   \lambda (x : 1).\;
