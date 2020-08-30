@@ -27,10 +27,10 @@ clean :
 	`cabal-plan list-bin site` clean
 
 upload : all
-	dotenv -f .env -- rsync -avz --progress _site/ '$$PRODUCTION'
+	dotenv -f .env -- rsync -4 -avz --progress _site/ '$$PRODUCTION'
 
 preview : all
-	dotenv -f .env -- rsync -avz --progress _site/ '$$STAGING'
+	dotenv -f .env -- rsync -4 -avz --progress _site/ '$$STAGING'
 
 tmp/%.tex : pkg/literate/%.lhs
 	mkdir -p tmp
