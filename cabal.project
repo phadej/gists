@@ -1,9 +1,7 @@
 index-state:   2020-05-10T17:53:22Z
 with-compiler: ghc-8.6.5
-
 packages:
-    "."
-    pkg/gists-runnable.cabal
+  "."
+  pkg/gists-runnable.cabal
 
-constraints:
-  hakyll +previewServer
+constraints:   hakyll +previewServer
