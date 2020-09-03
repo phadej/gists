@@ -351,6 +351,10 @@ vim bootstrap/linux-8.8.3.json  # process-1.6.9.0 ghc-boot-th-8.8.4 bytestring-0
 time python3.7 ./bootstrap/bootstrap.py -w /opt/ghc/8.8.4/bin/ghc --deps bootstrap/linux-8.8.3.json
 ```
 
+```
+time python3.7 release.py -w /opt/ghc/8.8.4/bin/ghc -C $HOME/cabal-3.4.0.0-bootstrapped/cabal
+````
+
 
 Alpine Linux x86\_64
 -------------------
@@ -375,11 +379,18 @@ mkdir cabal-3.4.0.0
 tar -xJvf cabal-install-3.4.0.0-x86_64-alpine-3.11.6-linux-bootstrapped.tar.xz -C cabal-3.4.0.0
 chmod a+x cabal-3.4.0.0/cabal
 
+# bootstrap
 git clone https://github.com/phadej/cabal.git
 cd cabal
 git checkout release-py-3.4
 vim bootstrap/linux-8.8.3.json
 time python3 ./bootstrap/bootstrap.py -w /opt/ghc/8.8.4/bin/ghc --deps bootstrap/linux-8.8.3.json
+
+# release
+git clone https://github.com/haskell/cabal.git
+cd cabal
+git checkout 3.4
+time python3.8 release.py -w /opt/ghc/8.8.4/bin/ghc -C $HOME/cabal-3.4.0.0/cabal -h
 ```
 
 ```
@@ -419,7 +430,7 @@ apt-get install -y cabal-install-3.2 ghc-8.8.4 python3.8 git build-essential zli
 git clone https://github.com/haskell/cabal.git
 cd cabal
 git checkout 3.4
-time python3.8 release.py -w /opt/ghc/8.8.3/bin/ghc -C /opt/cabal/3.2/bin/cabal
+time python3.8 release.py -w /opt/ghc/8.8.4/bin/ghc -C /opt/cabal/3.2/bin/cabal
 ```
 
 FreeBSD release
