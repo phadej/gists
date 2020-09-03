@@ -403,12 +403,18 @@ Ubuntu 16.04 release
 --------------------
 
 ```
+docker run --rm -ti ubuntu:16.04
+```
+
+```
+cd
+
 apt-get update
 apt-get install -y software-properties-common
 add-apt-repository -y ppa:hvr/ghc
 add-apt-repository -y ppa:deadsnakes/ppa
 apt-get update
-apt-get install -y cabal-install-3.2 ghc-8.8.3 python3.8 git build-essential zlib1g-dev
+apt-get install -y cabal-install-3.2 ghc-8.8.4 python3.8 git build-essential zlib1g-dev
 
 git clone https://github.com/haskell/cabal.git
 cd cabal
