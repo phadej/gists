@@ -365,7 +365,7 @@ docker run --rm -ti alpine:3.11
 ```
 
 ```
-apk add curl python3 git xz perl gcc musl-dev make vim gmp-dev zlib-dev zlib-static tmux
+apk add curl python3 git xz perl gcc musl-dev make vim gmp-dev zlib-dev zlib-static tmux openssh-client
 
 curl -O https://files.hasufell.de/ghc/ghc-8.8.4-x86_64-alpine-linux.tar.xz
 tar -xJvf ghc-8.8.4-x86_64-alpine-linux.tar.xz
