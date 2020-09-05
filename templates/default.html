@@ -30,6 +30,19 @@
             $body$
         </div></div>
 
+        $if(recent)$
+        <div class="row"><div class="columns">
+        <hr />
+        <ul>
+            $for(recent)$
+                <li> 
+                    <em>$date$</em> &ndash; <a href="$url$">$title$</a>
+                </li>
+            $endfor$
+        </ul>
+        </div></div>
+        $endif$
+
         <div class="row"><div class="columns">
         <hr />
         <a href="https://creativecommons.org/licenses/by-sa/2.0/">

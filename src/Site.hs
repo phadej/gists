@@ -81,6 +81,7 @@ main' renderFormulae = do
                 >>= loadAndApplyTemplate "templates/default.html" ctx
                 >>= relativizeUrls
 
+    -- actual posts
     match postsPattern $ do
         route $ setExtension "html"
         let compiler
@@ -89,17 +90,40 @@ main' renderFormulae = do
                 . reduceHeaders
                 . adjustImageFolder
                 . pandocTransform
-        compile $ compiler
-            >>= loadAndApplyTemplate "templates/post.html"    (postCtxWithTags tags)
-            >>= saveSnapshot "content"
-            >>= withItemBody (pure . withTagList makeToc)
-            >>= loadAndApplyTemplate "templates/default.html" postCtx
-            >>= relativizeUrls
+        compile $ do
+            recent <- fmap (take 5) . recentFirst =<< loadAll (postsPattern .&&. hasVersion "recents")
+
+            let postCtx' = listField "recent" postCtx (return recent) `mappend` postCtx
+
+            compiler
+                >>= loadAndApplyTemplate "templates/post.html"    (postCtxWithTags tags)
+                >>= saveSnapshot "content"
+                >>= withItemBody (pure . withTagList makeToc)
+                >>= loadAndApplyTemplate "templates/default.html" postCtx'
+                >>= relativizeUrls
+
+    -- recents
+    match postsPattern $ version "recents" $ do
+        route $ setExtension "html"
+        let compiler
+                = pandocCompilerWithTransformM readerOpts (writerOpts cabalSyntax)
+                $ renderFormulae pandocFormulaOptions
+                . reduceHeaders
+                . adjustImageFolder
+                . pandocTransform
+        compile $ do
+            compiler
+                >>= loadAndApplyTemplate "templates/post.html"    (postCtxWithTags tags)
+                >>= saveSnapshot "content"
+                >>= withItemBody (pure . withTagList makeToc)
+                >>= loadAndApplyTemplate "templates/default.html" postCtx
+                >>= relativizeUrls
 
     create ["archive.html"] $ do
         route idRoute
         compile $ do
-            posts <- recentFirst =<< loadAll postsPattern
+            posts <- recentFirst =<< loadAll (postsPattern .&&. hasNoVersion)
+
             let archiveCtx =
                     listField "posts" postCtx (return posts) `mappend`
                     constField "title" "Archives"            `mappend`
@@ -114,7 +138,8 @@ main' renderFormulae = do
     create ["index.html"] $ do
         route idRoute
         compile $ do
-            posts <- recentFirst =<< loadAll postsPattern
+            posts <- recentFirst =<< loadAll (postsPattern .&&. hasNoVersion)
+
             let indexCtx =
                     listField "posts" postCtx (return posts) `mappend`
                     constField "title" "Oleg Grenrus"        `mappend`
@@ -132,12 +157,11 @@ main' renderFormulae = do
         route idRoute
         compile $ do
             let feedCtx = postCtx `mappend` bodyField "description"
-            posts <- recentFirst =<<
-                loadAllSnapshots "posts/*" "content"
+            posts <- fmap (take 10) . recentFirst =<< loadAllSnapshots (postsPattern .&&. hasNoVersion) "content"
             renderAtom feedConfiguration feedCtx posts
 
 postsPattern :: Pattern
-postsPattern = fromRegex "^posts/.*\\.(md|lhs|tex)$"
+postsPattern = fromGlob "posts/*.md" .||. fromGlob "posts/*.tex" .||. fromGlob "posts/*.lhs"
 
 -------------------------------------------------------------------------------
 -- Latex
