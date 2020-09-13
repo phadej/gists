@@ -1,28 +1,30 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main (main) where
 
+import Control.Lens   hiding (Context)
 import Prelude ()
 import Prelude.Compat
-import Control.Lens hiding (Context)
 
-import Control.Monad (when)
+import Control.Monad              (when)
 import Control.Monad.State.Strict (State, runState)
-import Data.List (isPrefixOf)
-import Data.Semigroup (Min (..))
-import Text.Pandoc (Pandoc, Block (..), Inline (..))
-import Text.Pandoc.Walk (walk, query)
-import Skylighting (Syntax, parseSyntaxDefinition)
+import Data.List                  (isPrefixOf)
+import Data.Semigroup             (Min (..))
+import Skylighting                (Syntax, parseSyntaxDefinition)
+import System.Environment         (lookupEnv)
+import Text.Pandoc                (Block (..), Inline (..), Pandoc)
+import Text.Pandoc.Walk           (query, walk)
+import Text.Read                  (readMaybe)
 
 import Hakyll
 
-import qualified Data.Map as Map
-import qualified Text.HTML.TagSoup as TS
-import qualified Text.HTML.TagSoup.Tree as TS
-import qualified Text.Pandoc.Options as PO
+import qualified Data.Map                 as Map
+import qualified Text.HTML.TagSoup        as TS
+import qualified Text.HTML.TagSoup.Tree   as TS
 import qualified Text.Pandoc.Highlighting as PH
+import qualified Text.Pandoc.Options      as PO
 
-import qualified Hakyll.Contrib.LaTeX as LaTeX
-import qualified Image.LaTeX.Render as LaTeX
+import qualified Hakyll.Contrib.LaTeX      as LaTeX
+import qualified Image.LaTeX.Render        as LaTeX
 import qualified Image.LaTeX.Render.Pandoc as LaTeX
 
 -------------------------------------------------------------------------------
@@ -45,8 +47,17 @@ feedConfiguration = FeedConfiguration
 main :: IO ()
 main = LaTeX.initFormulaCompilerSVG 1000 environmentOptions >>= main'
 
+getShowRecents :: IO Bool
+getShowRecents = do
+    recents <- lookupEnv "GISTS_RECENT"
+    case recents >>= readMaybe :: Maybe Int of
+        Just 0 -> return False
+        _      -> return True
+
 main' :: (LaTeX.PandocFormulaOptions -> Pandoc -> Compiler Pandoc) -> IO ()
 main' renderFormulae = do
+  showRecents <- getShowRecents
+  print showRecents
   cabalSyntax <- parseSyntaxDefinition "syntax/cabal.xml" >>= either fail pure
   hakyll $ do
     match "images/*" $ do
@@ -103,7 +114,7 @@ main' renderFormulae = do
                 >>= relativizeUrls
 
     -- recents
-    match postsPattern $ version "recents" $ do
+    when showRecents $ match postsPattern $ version "recents" $ do
         route $ setExtension "html"
         let compiler
                 = pandocCompilerWithTransformM readerOpts (writerOpts cabalSyntax)

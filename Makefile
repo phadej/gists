@@ -20,7 +20,7 @@ repl:
 
 watch :
 	cabal v2-build gists:site
-	`cabal-plan list-bin site` watch
+	GISTS_RECENT=0 `cabal-plan list-bin site` watch
 
 clean :
 	cabal v2-build gists:site
