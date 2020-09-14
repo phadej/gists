@@ -5,10 +5,10 @@ tags: engineering
 ---
 
 Where a big part of `Cabal` is about interpreting `your-package.cabal`
-file, also an important part of it and also `cabal-install` are **file paths**.
-After all, `cabal-install` is build tool.
+file, also an important part of it and also `cabal-install` are **filepaths**.
+After all, `cabal-install` is a build tool.
 
-Currently (as of `Cabal-3.4`) the type used for all file path needs is infamous
+Currently (as of `Cabal-3.4`) the type used for all filepath needs is infamous
 
 ```
 type FilePath = String
@@ -26,7 +26,7 @@ I like `paths` better, because it is set up to talk about relative paths
 to arbitrary roots, not only *absolute paths*.
 
 Still, neither is good enough. Why I say so?
-Because `Cabal` and `cabal-install` have to deal with *three kind of paths*.
+Because `Cabal` and `cabal-install` have to deal with *three kinds of paths*.
 
 1. Abstract paths
 2. Paths on the host system
@@ -68,7 +68,7 @@ The representation of `APath` is not important. It, however, should be some kind
 Paths on the host system
 ------------------------
 
-These are concrete paths.
+These are the concrete paths on your disk.
 
 ```
 -- | A path on host (build) system
