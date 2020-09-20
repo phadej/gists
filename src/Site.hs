@@ -233,6 +233,10 @@ readerOpts = PO.def
         & PO.enableExtension PO.Ext_literate_haskell
         & PO.enableExtension PO.Ext_footnotes
         & PO.enableExtension PO.Ext_raw_tex
+        & PO.enableExtension PO.Ext_definition_lists
+
+        -- I'm not sure about this
+        & PO.enableExtension PO.Ext_markdown_in_html_blocks
     }
 
 pandocTransform :: Pandoc -> Pandoc

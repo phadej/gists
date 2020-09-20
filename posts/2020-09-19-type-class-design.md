@@ -58,6 +58,8 @@ process :: (HasField "name" x String, HasField "age" x Int) => x -> IO ()
 
 there is something wrong.
 
+TODO: add mumbling about `(@@) :: fun -> arg -> res`
+
 A mechanism for program synthesis
 ---------------------------------
 
@@ -218,7 +220,290 @@ Equality
 </blockquote>
 
 The type-classes in the remaining group of *abstract structures* will have *laws* attached.
-The laws are often some equalities, but what we mean by saying something have to be equal?
+The laws are often some equalities, but what we mean by saying something have to be equal, when is $x = y$?
+
+1. If the type has `Eq` instance, this is the equality: $x = y \mathrel{:\equiv} \text{\texttt{x == y}}$.
+2. If the type is `a -> b` then the the equality is *extensional* $f = g \mathrel{:\equiv} \forall x. f\,x = g\,x$.
+3. In other cases read the docs
+4. Only at last fall back to the *definitional equality*.
+
+<h3>Eq type-class</h3>
+
+`Eq` type class (which home module is [`Data.Eq`](https://hackage.haskell.org/package/base-4.14.0.0/docs/Data-Eq.html))
+is a perfect example of *abstract structure* type-class,
+which I'll talk later in more detail. Lets for now just briefly look at it:
+
+```haskell
+class Eq a where
+    (==) :: a -> a -> Bool
+    (/=) :: a -> a -> Bool
+
+    x == y = not (x /= y)
+    x /= y = not (x == y)
+
+    {-# MINIMAL (==) | (/=) #-}
+```
+
+And this class comes with laws.
+
+<blockquote>It is expected to have the following properties:
+
+Reflexivity
+: `x == x = True`
+
+Symmetry
+: `x == y = y == x`
+
+Transitivity
+: if `x == y && y == z = True`, then `x == z = True`
+
+Substitutivity
+: if `x == y = True` and `f` is a "public" function whose return type is an instance of `Eq`, then `f x == f y = True`
+
+Negation
+: `x /= y = not (x == y)`
+
+</blockquote>
+
+The last law, *negation*, is simply requiring that any non-default
+implementation of `(/=)` behaves as if was omitted. In other words,
+the `Eq` class could been defined as
+
+```
+class Eq a where
+    (==) :: a ->  a -> Bool
+
+(/=) :: Eq a => a -> a -> Bool
+x /= y = not (x == y)
+```
+
+and then the negation property would hold *definitionally*.
+However, it is made a member of `Eq` class.
+It is probably thought that there could be potentially more effecient implementation for `(/=)` then the default.
+That is true for members of [`Foldable`](https://hackage.haskell.org/package/base-4.14.0.0/docs/Data-Foldable.html#t:Foldable) type-class,
+but less clear for `Eq`.
+
+The first three laws, *reflexivity*, *symmetry* and *transitivity* make
+`Eq` *decide* an equivalence relation.
+
+The remaining, fourth property, *substitutivity* makes an equivalence on type `a`
+*the* equivalence for it. With my equality interpreation, I would make it a bit stronger:
+
+Substitutivity&prime;
+
+: if `x == y = True` and `f` is a "public" function, *then `f x` $=$ `f y`*.
+
+which makes it work also when return type of `f` is not an instance of `Eq`.
+
+The substitutivity is very important property.
+It allows as to *substitute* equal things for each other.
+The thing making equalitional reasoning possible.
+
+If the `Eq` instance is *structural equality*, then you
+cannot "accidentally"[^accident] violate substitutivity.
+
+[^accident]: Using [`reallyUnsafePtrEquality#`](https://hackage.haskell.org/package/ghc-prim-0.6.1/docs/GHC-Prim.html#v:reallyUnsafePtrEquality-35-)
+you can still discriminate structurally equal things.
+
+I interpret substitutivity requirement as rather
+*a requirement on the public functions* of abstract data types.
+
+For example, take [`Set` type from `containers`](https://hackage.haskell.org/package/containers-0.6.3.1/docs/Data-Set.html#g:1),
+given that `Ord a` is lawful, the `Eq (Set a)` will satisfy the
+substitutivity requirement for all functions in `Data.Set`.
+With an exception of `showTree` and `showTreeWith`, which highlights that it should live in `Data.Set.Internal` module.
+However `valid` is perfectly valid function: it should always return `True`!
+
+There are examples were substitutativity is shamelessly violated.
+
+The first example is [`CI` type constructor in `case-insensitive` package](https://hackage.haskell.org/package/case-insensitive-1.2.1.0/docs/Data-CaseInsensitive.html#t:CI)
+refines the type to be compared in case insensitive manner.
+That is useful. However the public interface (`Data.CaseInsensitive` module)
+has
+
+```haskell
+-- | Retrieve the original string-like value.
+original :: CI s -> s
+```
+
+method, which boldly violates substitutavity.
+A solution is to move `original` to `Data.CaseInsensitive.Unsafe` module.
+`Data.CaseInsensitive.original` is unsafe, as we cannot replace equals for equals.
+
+The second example is `HashSet` and `HashMap` from [`unordered-containers`](https://hackage.haskell.org/package/unordered-containers).
+
+```
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+import Test.QuickCheck
+import Data.Hashable
+import qualified Data.HashSet as HS
+
+newtype Element = E Int deriving (Eq, Ord, Show, Arbitrary)
+
+-- | This is stupid, but still valid instance.
+instance Hashable Element where
+    hashWithSalt salt (E n) = hashWithSalt salt (n `mod` 4)
+
+-- *Main> quickCheck prop1 
+-- +++ OK, passed 100 tests.
+prop1 :: [Element] -> Property
+prop1 xs = HS.fromList xs === HS.fromList (reverse xs)
+
+-- *Main> quickCheck prop2
+-- *** Failed! Falsified (after 8 tests and 3 shrinks):    
+-- [E 0,E 4]
+-- [E 0,E 4] /= [E 4,E 0]
+prop2 :: [Element] -> Property
+prop2 xs = hashnub xs === hashnub (reverse xs)
+  where
+    hashnub = HS.toList . HS.fromList
+```
+
+Unlike ordered `Set`, `HashSet` is unordered, and *public* `toList`
+function allows us to observe this difference.
+Suggesting moving `toList` into internal (or `Unsafe`, which would be "less" internal)
+module is very controversial proposition.
+Worse, we cannot hide `Foldable` instance.
+Therefore a solution is be *very very careful* when using `unordered-containers`.
+(A concrete problem I have encountered often is `Show` instance. The results aren't compared with `Eq`, but via textual representation. Equal things end up `show`n differently.)
+The monoids used with `foldMap`, and effects with `traverse` have to be commutative.
+The `hashnub` function, in above example, is deterministic, but we cannot make very strong claims about its behaviour.
+Can you quickly say whether it is involutive, whether the following property is true:
+
+```haskell
+prop3 :: [Element] -> Property
+prop3 xs = hashnub (hashnub xs) === hashnub xs
+  where
+    hashnub = HS.toList . HS.fromList
+```
+
+The third example is [`Arg`](https://hackage.haskell.org/package/base-4.14.0.0/docs/Data-Semigroup.html#t:Arg) type.
+
+```
+-- Essentially a pair
+data Arg a b = Arg a b
+
+-- But only with the first half considered relevant
+instance Eq a => Eq (Arg a b) where
+    Arg x _ == Arg y _ = x == y
+```
+
+I have no experience whether `ArgMin = Min (Arg a b)` and `ArgMax = Max (Arg a b)` are useful,
+but `Arg` is definitely useful to highlight sharing properties related to "identity" of values.
+In theory equals can be replaced for equals, but in practice we usually want some sharing, in other words keep as few copies as possible of equal terms in memory.
+
+Let me conclude this section by discussing
+[lattices#84 issue](https://github.com/phadej/lattices/issues/84). Paraphrasing
+
+<blockquote>
+Take `Arg Int String`, its `Ord` instance considers only first half of a `Arg`-pair.
+
+Now with
+
+```
+x, y :: Set (Arg Int String)
+x = Set.fromList [Arg 0 "X"]
+y = Set.fromList [Arg 0 "Y"]
+```
+
+The `Set.union x y` and `Set.union y x` appear to be different:
+
+```
+*Main> Set.union x y
+fromList [Arg 0 "X"]
+*Main> Set.union y x
+fromList [Arg 0 "Y"]
+```
+</blockquote>
+
+To which I replied: They *appear* different, but they are *equal* (in this case, their type have an instance of `Eq`)
+
+```
+*Main> Set.union x y == Set.union y x
+True
+```
+
+The discussion on issue continues with
+
+<blockquote>
+If you want the semilattice laws to hold with respect to `Eq`, rather than extensional equality, how would you describe them for the instance `JoinSemiLattice (a -> b)`?
+</blockquote>
+
+To which I can now answer: that I don't want the laws to hold with 
+respect to `Eq` but to an equality notion I have defined in this section.
+Equality on `a -> b` is not a problem, my definition covers it.
+
+<h3>Extensional equality?</h3>
+
+We often (informally) use the functional extensionality in reasoning
+
+$$
+f = g \coloneqq \forall x. f\,x = g\,x
+$$
+
+i.e. consider functions equal when they map (equal) inputs to the equal outputs.
+
+One way forward would be to require laws to hold up to extensional equality.
+This simply wont work in Haskell.
+Even operations on very well behaved `Set` won't satisfy about any law,
+as the underlying tree might be rotated differently.
+
+In HoTT we can define types to have extra equalities,
+and for example say that rotating a tree doesn't make them inequal.
+And nothing in the language would be able to observe it (don't worry if you don't understand how it is possible).
+Cubical Agda is an implementation you might want to play with.
+But I warn you: if programming in Agda is *difficult*, then programming in Cubical Agda is *difficult&sup3;*.
+
+Therefore I explicitly use extensionality only for functions.
+The third point of *read the docs*.
+An example of that is a [`Gen` type from `QuickCheck`](https://hackage.haskell.org/package/QuickCheck-2.14.1/docs/Test-QuickCheck.html#t:Gen).
+That does it mean for its `Monad` instance to be lawful?
+
+If we had a helper function
+
+```
+deterministicSample :: Gen a -> a
+deterministicSample = ...
+```
+
+which we could for now imagine to exist in public `QuickCheck` interface.
+Then we will get different results for
+
+```
+*Main> determinsiticSample (choose ('a','z'))
+'t'
+*Main> determinsiticSample (choose ('a','z') >>= return)
+'p'
+```
+
+but the right identity law says
+
+```
+m >>= return = m  -- right identity
+```
+
+Is `Gen` unlawful `Monad`? I don't think so.
+It is argued (though unfortunately not reflected in the `QuickCheck` haddocks)
+that `Gen a` represents a *distribution* of *a* values.
+
+Whether purposedly or accidentally it is good that `deterministicSample`
+doesn't exist in `Test.QuickCheck` module interface.
+The [`generate :: Gen a -> IO a`](https://hackage.haskell.org/package/QuickCheck-2.14.1/docs/Test-QuickCheck.html#v:generate)
+is about as good as it gets.
+The value you get by sampling the `Gen` distribution can depend on phase of the Moon.
+
+In other words `Test.QuickCheck` is (mostly) fine.
+`Gen` equality is explainable as equality of distributions,
+and `Test.QuickCheck` doesn't export any function which would let you observe otherwise.
+
+<h3>Definitional equality</h3>
+
+TBW...
+
+Abstract structures
+-------------------
+
+
 
 ---
 
