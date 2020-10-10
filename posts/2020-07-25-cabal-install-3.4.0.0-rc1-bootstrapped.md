@@ -365,6 +365,8 @@ docker run --rm -ti alpine:3.11
 ```
 
 ```
+cd
+
 apk add curl python3 git xz perl gcc musl-dev make vim gmp-dev zlib-dev zlib-static tmux openssh-client
 
 curl -O https://files.hasufell.de/ghc/ghc-8.8.4-x86_64-alpine-linux.tar.xz
@@ -378,6 +380,7 @@ curl -O https://oleg.fi/cabal-install-3.4.0.0-rc1-bootstrapped/cabal-install-3.4
 mkdir cabal-3.4.0.0
 tar -xJvf cabal-install-3.4.0.0-x86_64-alpine-3.11.6-linux-bootstrapped.tar.xz -C cabal-3.4.0.0
 chmod a+x cabal-3.4.0.0/cabal
+$HOME/cabal-3.4.0.0/cabal --version
 
 # bootstrap
 git clone https://github.com/phadej/cabal.git
@@ -390,7 +393,8 @@ time python3 ./bootstrap/bootstrap.py -w /opt/ghc/8.8.4/bin/ghc --deps bootstrap
 git clone https://github.com/haskell/cabal.git
 cd cabal
 git checkout 3.4
-time python3.8 release.py -w /opt/ghc/8.8.4/bin/ghc -C $HOME/cabal-3.4.0.0/cabal -h
+git log -1
+time python3.8 release.py -w /opt/ghc/8.8.4/bin/ghc -C $HOME/cabal-3.4.0.0/cabal --enable-static-executable --disable-ofd
 ```
 
 ```
