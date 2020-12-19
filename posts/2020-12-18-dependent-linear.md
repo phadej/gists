@@ -284,7 +284,7 @@ If we already have $\top$ (there is no way to get rid of it),
 we can tensor it with something else we don't like and map the resulting "pair" to another $\top$.
 Bottomless trash can!
 
-In category theory we avoid speaking avoid objects directly (it is point-free extreme).
+In category theory we avoid speaking about objects directly (it is point-free extreme).
 If we need to, we speak about object $A$, we rather talk about $1 \to A$ morphism (constant function).
 This works because, e.g. in Sets category:
 
