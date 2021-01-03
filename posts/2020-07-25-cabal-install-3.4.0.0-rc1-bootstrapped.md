@@ -19,6 +19,18 @@ I try to use GHC-8.8 as the bootstrapping compiler.
 Ideally the good parts of these will be encoded
 as CI setup scripts.
 
+```
+curl -O https://raw.githubusercontent.com/haskell/cabal/725ca482d869e03be66bc845b39662ec0609bd99/release.py
+curl -O http://oleg.fi/cabal-install-3.4.0.0-rc4/Cabal-3.4.0.0.tar.gz
+curl -O http://oleg.fi/cabal-install-3.4.0.0-rc4/cabal-install-3.4.0.0.tar.gz
+cat > SHA256SUMS <<EOF
+47f95c62b6ec25900ff391fccdbcb46dd87efca6a83d8e80d7834a2cee9158bc  release.py
+a1e9d803bf99c4989c82d63f6ae619740ece0282987dd3c8bae2fe158b85ed4c  Cabal-3.4.0.0.tar.gz
+0499406c277bcaa431a0666d3e5ea171ee5bd7d66e6cf48ff275452d0723bb8b  cabal-install-3.4.0.0.tar.gz
+EOF
+sha256sum -c SHA256SUMS
+```
+
 x86\_64 Linux
 ------------
 
@@ -395,6 +407,8 @@ cd cabal
 git checkout 3.4
 git log -1
 time python3.8 release.py -w /opt/ghc/8.8.4/bin/ghc -C $HOME/cabal-3.4.0.0/cabal --enable-static-executable --disable-ofd
+
+time python3.8 release.py -w /opt/ghc/8.8.4/bin/ghc -C $HOME/cabal-3.4.0.0/cabal --tarlib Cabal-*.tar.gz --tarexe cabal-install-*.tar.gz --enable-static-executable --disable-ofd
 ```
 
 ```
@@ -429,12 +443,14 @@ apt-get install -y software-properties-common
 add-apt-repository -y ppa:hvr/ghc
 add-apt-repository -y ppa:deadsnakes/ppa
 apt-get update
-apt-get install -y cabal-install-3.2 ghc-8.8.4 python3.8 git build-essential zlib1g-dev
+apt-get install -y cabal-install-3.2 ghc-8.8.4 python3.8 git build-essential zlib1g-dev curl
 
 git clone https://github.com/haskell/cabal.git
 cd cabal
 git checkout 3.4
 time python3.8 release.py -w /opt/ghc/8.8.4/bin/ghc -C /opt/cabal/3.2/bin/cabal
+
+time python3.8 release.py -w /opt/ghc/8.8.4/bin/ghc -C /opt/cabal/3.2/bin/cabal --tarlib Cabal-*.tar.gz --tarexe cabal-install-*.tar.gz
 ```
 
 FreeBSD release
@@ -452,4 +468,7 @@ git clone https://github.com/haskell/cabal.git
 cd cabal
 git checkout 3.4
 time python3.7 release.py -w /opt/ghc/8.8.4/bin/ghc -C $HOME/cabal-3.4.0.0-bootstrapped/cabal
+
+
+time python3.7 release.py -w /opt/ghc/8.8.4/bin/ghc -C $HOME/cabal-3.4.0.0-bootstrapped/cabal --tarlib=Cabal-3.4.0.0.tar.gz --tarexe=cabal-install-3.4.0.0.tar.gz
 ```
