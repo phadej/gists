@@ -1,0 +1,563 @@
+The term \emph{coindexed optics} is sometimes brought up.
+But what are they?
+One interpretation is \emph{optics with error reporting},
+i.e. which can tell why e.g. |Prism| didn't match\footnote{%
+\url{https://blog.fp-tower.com/2020-01-27-introducing-error-reporting-in-optics/} looks like an example of that. In Scala.
+}.
+For some time I started to dislike that interpretation.
+It doesn't feel right.
+
+Recently I run into documentation of
+\href{https://hackage.haskell.org/package/witherable}{\texttt{witherable}}.
+There is |Wither|, which is like a lens, but not quite.
+I think that is what \emph{coindexed} could be.
+(However, there are plenty arrows to flip, and you may flip others).
+
+This blog post is a literate Haskell file, so we start with
+language extensions
+
+\begin{code}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE EmptyCase #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeOperators #-}
+\end{code}
+
+The import list is shorter,
+|Data.SOP| is the only module (from
+\href{https://hackage.haskell.org/package/sop-core}{\texttt{sop-core}})
+which is not in \texttt{base}.
+
+\begin{code}
+import Control.Applicative (liftA2)
+import Data.Kind           (Type)
+import Data.Bifunctor      (Bifunctor (first))
+import Data.Char           (toUpper)
+import Data.Coerce         (coerce)
+import Data.SOP            (NP (..), NS (..), I (..))
+
+import qualified Data.Maybe as L (mapMaybe)
+\end{code}
+
+I will use a variant of profunctor encoding of optics. The plan is
+\begin{itemize}
+\item Ordinary, unindexed optics;
+\item then indexed optics;
+\item and finally coindexed optics.
+\end{itemize}
+
+\subsection{Ordinary, unindexed optics}
+
+The profunctor encoding of optics is relatively simple.
+However, instead of ordinary profunctors, we will
+use a variant with addition \emph{type level list}.
+This is similar to
+\href{https://hackage.haskell.org/package/indexed-profunctors}{\texttt{indexed-profunctors}},
+though there the type list is curried.
+That works well for indexed optics, but complicates coindexed story.
+
+\begin{code}
+type Optic p (is :: [Type]) (js :: [Type]) s t a b = p is a b -> p js s t
+\end{code}
+
+To not make this post unnecessarily long,
+we will use only a subset of hierarchy: |Profunctor| and |Mapping| for now.
+|Profunctor| is used to encode isomorphisms (isos),
+and |Mapping| is used to encode setters.
+
+\begin{code}
+class Profunctor (p :: [Type] -> Type -> Type -> Type) where
+    dimap :: (a -> b) -> (c -> d) -> p is b c -> p is a d
+
+class Profunctor p => Mapping p where
+    roam :: ((a -> b) -> s -> t) -> p is a b -> p is s t
+\end{code}
+
+A go to example of a setter is |mapped|.
+With |mapped| we can set, or map over, elements in a |Functor|.
+
+\begin{code}
+mapped :: (Mapping p, Functor f)
+       => Optic p is is (f a) (f b) a b
+mapped = roam fmap
+\end{code}
+
+To implement the |over| operation we need a concrete profunctor.
+If we used ordinary profunctors, the function arrow would do.
+In this setup we need a newtype to adjust the kind:
+
+\begin{code}
+newtype FunArrow (is :: [Type]) a b =
+    FunArrow { runFunArrow :: a  -> b }
+\end{code}
+
+Instance implementation are very straight forward:
+
+\begin{code}
+instance Profunctor FunArrow where
+    dimap f g (FunArrow k) = FunArrow (g . k . f)
+
+instance Mapping FunArrow where
+    roam f (FunArrow k) = FunArrow (f k)
+\end{code}
+
+Using |FunArrow| we can implement |over|.
+|over| allows to use a setter to map \emph{over} focused elements
+in a bigger structure.
+Note, we allow any index type-lists.
+We simply ignore them.
+
+\begin{code}
+over :: Optic FunArrow is js s t a b
+     -> (a -> b)
+     -> (s -> t)
+over o f = runFunArrow (o (FunArrow f))
+\end{code}
+
+And finally some examples. |over mapped| is a complicated way to say |fmap|:
+
+\begin{code}
+-- "FOOBAR"
+example01 :: String
+example01 = over mapped toUpper "foobar"
+\end{code}
+
+But optics compose. |over (mapped . mapped)| maps over two composed functors:
+
+\begin{code}
+-- ["FOOBAR","XYZZY"]
+example02 :: [String]
+example02 = over (mapped . mapped) toUpper ["foobar", "xyzzy"]
+\end{code}
+
+This was a brief refreshed of profunctor optics.
+It is "standard", except that we added an additional
+type-argument to the profunctors.
+
+We will next use it to implement indexed optics.
+
+\subsection{Indexed optics}
+
+Indexed optics let us set, map, traverse etc. using an additional index.
+The operation we want to generalize with optics is provided
+by few classes, like |FunctorWithIndex|:
+
+\begin{code}
+class Functor f => FunctorWithIndex i f | f -> i where
+    imap :: (i -> a -> b) -> f a -> f b
+\end{code}
+
+|imap| operation is sometimes called |mapWithKey|, for example
+in |containers| library.
+
+Ordinary lists are indexed with integers. |Map k v| is indexed with |k|.
+We will use lists in the examples, so let us define an instance:
+
+\begin{code}
+instance FunctorWithIndex Int [] where
+    imap f = zipWith f [0..]
+\end{code}
+
+Next, we need that available in optics.
+New functionality means new type class
+
+\begin{code}
+class Mapping p => IMapping p where
+    iroam :: ((i -> a -> b) -> s -> t) -> p (i ': is) a b -> p is s t
+\end{code}
+
+Using |iroam| and |imap| we can define |imapped|,
+an example of \emph{indexed setter}.
+
+\begin{code}
+imapped :: (FunctorWithIndex i f, IMapping p)
+        => p (i ': is) a b -> p is (f a) (f b)
+imapped = iroam imap
+\end{code}
+
+Here, I should note that |FunArrow| can be given an instance of |IMapping|.
+We simply ignore the index.
+
+\begin{code}
+instance IMapping FunArrow where
+    iroam f (FunArrow k) = FunArrow (f (\_ -> k))
+\end{code}
+
+That allows us to use |imapped| instead of |mapped|.
+(both \texttt{optics} and \texttt{lens} libraries have tricks to make that efficient).
+
+\begin{code}
+-- ["FOOBAR","XYZZY"]
+example03 :: [String]
+example03 = over (mapped . imapped) toUpper ["foobar", "xyzzy"]
+\end{code}
+
+To actually use indices, we need new concrete profunctor.
+The |IxFunArrow| takes a heterogeneous list, |NP I| (n-ary product),
+of indices in addition to the element.
+
+\begin{code}
+newtype IxFunArrow is a b =
+    IxFunArrow { runIxFunArrow :: (NP I is, a) -> b }
+\end{code}
+
+The |IxFunArrow| instances are similar to |FunArrow| ones,
+they involve just a bit of additional plumbing.
+
+\begin{code}
+instance Profunctor IxFunArrow where
+    dimap f g (IxFunArrow k) = IxFunArrow (g . k . fmap f)
+
+instance Mapping IxFunArrow where
+    roam f (IxFunArrow k) = IxFunArrow (\(is, s) -> f (\a -> k (is, a)) s)
+\end{code}
+    
+|IMapping| instance is the most interesting.
+As the argument provides an additional index |i|,
+it is consed to the the list of existing indices.
+
+\begin{code}
+instance IMapping IxFunArrow where
+    iroam f (IxFunArrow k) = IxFunArrow $
+        \(is, s) -> f (\i a -> k (I i :* is, a)) s
+\end{code}
+
+As I already mentioned, \texttt{indexed-profunctors} uses curried
+variant, so the index list is implicitly encoded in uncurried
+form |i1 -> i2 -> ...|.
+That is clever, but hides the point.
+
+Next, the indexed |over|.
+The general variant takes an optic with any indices list.
+
+\begin{code}
+gen_iover :: Optic IxFunArrow is '[] s t a b
+         -> ((NP I is, a) -> b)
+         -> s -> t
+gen_iover o f s = runIxFunArrow (o (IxFunArrow f)) (Nil, s)
+\end{code}
+
+Usually we use the single-index variant, |iover|:
+
+\begin{code}
+iover :: Optic IxFunArrow '[i] '[] s t a b
+      -> (i -> a -> b)
+      -> s -> t
+iover o f = gen_iover o (\(I i :* Nil, a) -> f i a)
+\end{code}
+
+We can also define the double-index variant, |iover2| (and so on).
+
+\begin{code}
+iover2 :: Optic IxFunArrow '[i,j] '[] s t a b
+       -> (i -> j -> a -> b)
+       -> (s -> t)
+iover2 o f = gen_iover o (\(I i :* I j :* Nil, a) -> f i j a)
+\end{code}
+
+Lets see what we can do with indexed setters.
+For example we can upper case every odd character in the string:
+
+\begin{code}
+-- "fOoBaR"
+example04 :: String
+example04 = iover imapped (\i a -> if odd i then toUpper a else a) "foobar"
+\end{code}
+
+In nested case, we have access to all indices:
+
+\begin{code}
+-- ["fOoBaR","XyZzY","uNoRdErEd-cOnTaInErS"]
+example05 :: [String]
+example05 = iover2
+    (imapped . imapped)
+    (\i j a -> if odd (i + j) then toUpper a else a)
+    ["foobar", "xyzzy", "unordered-containers"]
+\end{code}
+
+We don't need to index at each step,
+e.g. we can index only at the top level:
+
+\begin{code}
+-- ["foobar","XYZZY","unordered-containers"]
+example06 :: [String]
+example06 = iover
+    (imapped . mapped)
+    (\i a -> if odd i then toUpper a else a)
+    ["foobar", "xyzzy", "unordered-containers"]
+\end{code}
+
+Indexed optics are occasionally very useful.
+We can provide extra information in indices,
+which would otherwise not fit into optical frameworks.
+
+\section{Coindexes}
+
+The indexed optics from previous sections can be flipped to be coindexed ones.
+As I mentioned in the introduction, I got an idea at looking at
+\href{https://hackage.haskell.org/package/witherable}{\texttt{witherable}}.
+package.
+
+\texttt{witherable} provides (among many things) a useful type-class,
+in a simplified form:
+
+\begin{code}
+class Functor f => Filterable f where
+    mapMaybe :: (a -> Maybe b) -> f a -> f b
+\end{code}
+
+It is however too simple. (Hah!).
+The connection to indexed optics is easier to see using
+an |Either| variant:
+
+\begin{code}
+class Functor f => FunctorWithCoindex j f | f -> j where
+    jmap :: (a -> Either j b) -> f a -> f b
+\end{code}
+
+We'll also need a |Traversable| variant (|Witherable| in \texttt{witherable}):
+
+\begin{code}
+class (Traversable f, FunctorWithCoindex j f)
+    => TraversableWithCoindex j f | f -> j
+  where
+    jtraverse :: Applicative m => (a -> m (Either j b)) -> f a -> m (f b)
+\end{code}
+
+Instances for list are not complicated.
+The \emph{coindex} of list is a unit |()|.
+
+\begin{code}
+instance FunctorWithCoindex () [] where
+    jmap f = L.mapMaybe (either (const Nothing) Just . f)
+
+instance TraversableWithCoindex () [] where
+    jtraverse _ [] = pure []
+    jtraverse f (x:xs) = liftA2 g (f x) (jtraverse f xs) where
+        g (Left ()) ys = ys
+        g (Right y) ys = y : ys
+\end{code}
+
+With "boring" coindex, like the unit, we can recover |mapMaybe|:
+
+\begin{code}
+mapMaybe' :: FunctorWithCoindex () f => (a -> Maybe b) -> f a -> f b
+mapMaybe' f = jmap (maybe (Left ()) Right . f)
+\end{code}
+
+With |TraversableWithCoindex| class, doing the same tricks as previously
+with indexed optics, we get coindexed optics. Easy.
+
+I didn't manage to get |JMapping| (a coindexed mapping) to work,
+so I'll use |JTraversing|.
+We abuse the index list for coindices.
+
+\begin{code}
+class Profunctor p => Traversing p where
+    wander :: (forall f. Applicative f => (a -> f b) -> s -> f t)
+           -> p js a b -> p js s t
+
+class Traversing p => JTraversing p where
+    jwander
+        :: (forall f. Applicative f => (a -> f (Either j b)) -> s -> f t)
+        -> p (j : js) a b -> p js s t
+\end{code}
+
+Using |JTraversing| we can define our first coindexed optic.
+
+\begin{code}
+traversed :: (Traversable f, Traversing p) => p js a b -> p js (f a) (f b)
+traversed = wander traverse
+
+jtraversed :: (TraversableWithCoindex j f, JTraversing p)
+           => p (j : js) a b -> p js (f a) (f b)
+jtraversed = jwander jtraverse
+\end{code}
+
+To make use of it we once again need a concrete profunctor.
+
+\begin{code}
+newtype CoixFunArrow js a b = CoixFunArrow
+    { runCoixFunArrow :: a -> Either (NS I js) b }
+
+instance Profunctor CoixFunArrow where
+    dimap f g (CoixFunArrow p) = CoixFunArrow (fmap g . p . f)
+
+instance Traversing CoixFunArrow where
+    wander f (CoixFunArrow p) = CoixFunArrow $ f p
+
+instance JTraversing CoixFunArrow where
+    jwander f (CoixFunArrow p) = CoixFunArrow $ f (plumb . p) where
+        plumb :: Either (NS I (j : js)) b -> Either (NS I js) (Either j b)
+        plumb (Right x)        = Right (Right x)
+        plumb (Left (Z (I y))) = Right (Left y)
+        plumb (Left (S z))     = Left z
+\end{code}
+
+Interestingly, |Traversing CoixFunArrow| instance looks like
+|Mapping FunArrow|, and it seems to be impossible to write |Mapping IxFunArrow|.
+
+Anyway, next we define a coindexed |over|, which I unimaginatively call |jover|.
+Like in previous section, I start with a generic version first.
+
+\begin{code}
+gen_jover
+    :: Optic CoixFunArrow is '[] s t a b
+    -> (a -> Either (NS I is) b) -> s -> t
+gen_jover o f s = either nsAbsurd id
+                $ runCoixFunArrow (o (CoixFunArrow f)) s
+
+jover
+    :: Optic CoixFunArrow '[i] '[] s t a b
+    -> (a -> Either i b) -> s -> t
+jover o f = gen_jover o (first (Z . I) . f)
+
+jover2
+    :: Optic CoixFunArrow '[i,j] '[] s t a b
+    -> (a -> Either (Either i j) b)
+    -> s -> t
+jover2 o f = gen_jover o (first plumb . f) where
+    plumb (Left i)  = Z (I i)
+    plumb (Right j) = S (Z (I j)) 
+\end{code}
+
+And now the most fun: the examples.
+First we can recover the |mapMaybe| behavior:
+
+\begin{code}
+-- ["foobar"]
+example07 :: [String]
+example07 = jover jtraversed
+    (\s -> if length s > 5 then Right s else Left ())
+    ["foobar", "xyzzy"]
+\end{code}
+
+And because we have separate coindexes in the type level list,
+we can filter on different levels of the structure!
+If we find a character |'y'|, we skip the whole
+word, otherwise we skip all vowels.
+
+\begin{code}
+-- ["fbr","nrdrd-cntnrs"]
+example08 :: [String]
+example08 = jover2 (jtraversed . jtraversed)
+    predicate
+    ["foobar", "xyzzy", "unordered-containers"]
+  where
+    predicate 'y'           = Left (Right ())  -- skip word
+    predicate c | isVowel c = Left (Left ())   -- skip character
+    predicate c             = Right c
+
+isVowel :: Char -> Bool
+isVowel c = elem c ['a','o','u','i','e']
+\end{code}
+
+Note, the coindex doesn't need to mean filtering.
+For example, consider the following type:
+
+\begin{code}
+newtype JList j a = JList { unJList :: [Either j a] }
+  deriving (Functor, Foldable, Traversable, Show)
+\end{code}
+
+It's not |Filterable|, but it can write a |FunctorWithCoindex| instance:
+
+\begin{code}
+instance FunctorWithCoindex j (JList j) where
+    jmap f (JList xs) = JList (map (>>= f) xs) where
+
+instance TraversableWithCoindex j (JList j) where
+    jtraverse f (JList xs) = fmap JList (go xs) where
+        go []             = pure []
+        go (Left j : ys)  = fmap (Left j :) (go ys)
+        go (Right x : ys) = liftA2 (:) (f x) (go ys)
+\end{code}
+
+Using |JList| we can do different things.
+In this example, we return why elements didn't match,
+but that information is returned embedded inside the structure itself.
+We "filter" long strings:
+
+\begin{code}
+jlist :: [a] -> JList j a
+jlist = JList . map Right
+
+ex_jlist_a :: JList Int String
+ex_jlist_a = jlist ["foobar", "xyzzy", "unordered-containers"]
+
+-- JList {unJList = [Left 6,Right "xyzzy",Left 20]}
+example09 :: JList Int String
+example09 = jover jtraversed
+    (\s -> let l = length s in if l > 5 then Left l else Right s)
+    ex_jlist_a
+\end{code}
+
+Similarly we can filter, or rather "change structure", on different levels,
+and these levels can have different coindices:
+
+\begin{code}
+ex_jlist_b :: JList Int (JList Bool Char)
+ex_jlist_b = fmap jlist ex_jlist_a
+
+example88b :: JList Int (JList Bool Char)
+example88b = jover2
+    (jtraversed . jtraversed)
+    predicate
+    ex_jlist_b
+  where
+    predicate 'x'           = Left (Right 0)
+    predicate 'y'           = Left (Right 1)
+    predicate 'z'           = Left (Right 2)
+    predicate c | isVowel c = Left (Left (c == 'o'))
+    predicate c             = Right c
+
+{-
+[ Right [Right 'f',Left True,Left True,Right 'b',Left False,Right 'r']
+, Left 0
+, Right [Left False,Right 'n',Left True,Right 'r',Right 'd',Left False, ...
+]
+-}
+example88b' :: [Either Int [Either Bool Char]]
+example88b' = coerce example88b
+\end{code}
+
+The |"xyzzy"| is filtered immediately, we see |Left 0| as a reason.
+We can also see how vowels are filtered, and |'o'| are marked specifically
+with |Left True|.
+
+Having coindices reside inside the structure makes composition just work.
+That what makes this different from "error reporting optics".
+And using coindices approach we can compose filters,
+the |Wither| from \texttt{witherable} doesn't seem to compose
+with itself.
+
+\section{Both}
+
+Obvious follow up question is whether we can have both indices and coindices.
+Why not, the concrete profunctor would look like:
+
+\begin{code}
+newtype DuplexFunArrow is js a b = DuplexFunArrow
+    { runDuplexFunArrow :: (NP I is, a) -> Either (NS I js) b }
+\end{code}
+
+Intuitively, the structure traversals would provide additional
+information in indices, and we'll be able to alter it by optionally
+returning coindices.
+
+Would that be useful? I have no idea.
+
+\appendix
+
+\section{Utilities}
+
+\begin{code}
+nsAbsurd :: NS I '[] -> a
+nsAbsurd x = case x of {}
+\end{code}
