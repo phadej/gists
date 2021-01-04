@@ -10,7 +10,7 @@ It doesn't feel right.
 Recently I run into documentation of
 \href{https://hackage.haskell.org/package/witherable}{\texttt{witherable}}.
 There is |Wither|, which is like a lens, but not quite.
-I think that is what \emph{coindexed} could be.
+I think that is closer to what \emph{coindexed optics} could be.
 (However, there are plenty arrows to flip, and you may flip others).
 
 This blog post is a literate Haskell file, so we start with
@@ -32,7 +32,7 @@ language extensions
 The import list is shorter,
 |Data.SOP| is the only module (from
 \href{https://hackage.haskell.org/package/sop-core}{\texttt{sop-core}})
-which is not in \texttt{base}.
+which is not in \texttt{base} library.
 
 \begin{code}
 import Control.Applicative (liftA2)
@@ -45,9 +45,9 @@ import Data.SOP            (NP (..), NS (..), I (..))
 import qualified Data.Maybe as L (mapMaybe)
 \end{code}
 
-I will use a variant of profunctor encoding of optics. The plan is
+I will use a variant of profunctor encoding of optics. The plan is to show
 \begin{itemize}
-\item Ordinary, unindexed optics;
+\item ordinary, unindexed optics;
 \item then indexed optics;
 \item and finally coindexed optics.
 \end{itemize}
@@ -56,18 +56,18 @@ I will use a variant of profunctor encoding of optics. The plan is
 
 The profunctor encoding of optics is relatively simple.
 However, instead of ordinary profunctors, we will
-use a variant with addition \emph{type level list}.
+use a variant with additional \emph{type level list} argument.
 This is similar to
 \href{https://hackage.haskell.org/package/indexed-profunctors}{\texttt{indexed-profunctors}},
 though there the type list is curried.
-That works well for indexed optics, but complicates coindexed story.
+Currying works well for indexed optics, but complicates coindexed story.
 
 \begin{code}
 type Optic p (is :: [Type]) (js :: [Type]) s t a b = p is a b -> p js s t
 \end{code}
 
 To not make this post unnecessarily long,
-we will use only a subset of hierarchy: |Profunctor| and |Mapping| for now.
+we will use only a subset of profunctor hierarchy: |Profunctor| and |Mapping| for now.
 |Profunctor| is used to encode isomorphisms (isos),
 and |Mapping| is used to encode setters.
 
@@ -97,7 +97,7 @@ newtype FunArrow (is :: [Type]) a b =
     FunArrow { runFunArrow :: a  -> b }
 \end{code}
 
-Instance implementation are very straight forward:
+Instance implementations are straight forward:
 
 \begin{code}
 instance Profunctor FunArrow where
@@ -108,10 +108,9 @@ instance Mapping FunArrow where
 \end{code}
 
 Using |FunArrow| we can implement |over|.
-|over| allows to use a setter to map \emph{over} focused elements
-in a bigger structure.
+|over| uses a setter to map \emph{over} focused elements in a bigger structure.
 Note, we allow any index type-lists.
-We simply ignore them.
+We (or rather |FunArrow|) simply ignore them.
 
 \begin{code}
 over :: Optic FunArrow is js s t a b
@@ -120,15 +119,16 @@ over :: Optic FunArrow is js s t a b
 over o f = runFunArrow (o (FunArrow f))
 \end{code}
 
-And finally some examples. |over mapped| is a complicated way to say |fmap|:
+Some examples, to show it works what we have written so far.
+|over mapped| is a complicated way to say |fmap|:
 
 \begin{code}
 -- "FOOBAR"
 example01 :: String
 example01 = over mapped toUpper "foobar"
 \end{code}
-
-But optics compose. |over (mapped . mapped)| maps over two composed functors:
+ 
+Optics compose. |over (mapped . mapped)| maps over two composed functors:
 
 \begin{code}
 -- ["FOOBAR","XYZZY"]
@@ -136,11 +136,11 @@ example02 :: [String]
 example02 = over (mapped . mapped) toUpper ["foobar", "xyzzy"]
 \end{code}
 
-This was a brief refreshed of profunctor optics.
+This was a brief refresher of profunctor optics.
 It is "standard", except that we added an additional
-type-argument to the profunctors.
+type-level list argument to the profunctors.
 
-We will next use it to implement indexed optics.
+We will next use that type-level list to implement indexed optics.
 
 \subsection{Indexed optics}
 
@@ -153,8 +153,8 @@ class Functor f => FunctorWithIndex i f | f -> i where
     imap :: (i -> a -> b) -> f a -> f b
 \end{code}
 
-|imap| operation is sometimes called |mapWithKey|, for example
-in |containers| library.
+|imap| operation is sometimes called |mapWithKey| (for example
+in |containers| library).  
 
 Ordinary lists are indexed with integers. |Map k v| is indexed with |k|.
 We will use lists in the examples, so let us define an instance:
@@ -164,8 +164,9 @@ instance FunctorWithIndex Int [] where
     imap f = zipWith f [0..]
 \end{code}
 
-Next, we need that available in optics.
-New functionality means new type class
+Next, we need to make that available in optics framework.
+New functionality means new profunctor type class.
+Note how an indexed combinator conses the index to the list.
 
 \begin{code}
 class Mapping p => IMapping p where
@@ -173,7 +174,7 @@ class Mapping p => IMapping p where
 \end{code}
 
 Using |iroam| and |imap| we can define |imapped|,
-an example of \emph{indexed setter}.
+which is an example of \emph{indexed setter}.
 
 \begin{code}
 imapped :: (FunctorWithIndex i f, IMapping p)
@@ -181,8 +182,8 @@ imapped :: (FunctorWithIndex i f, IMapping p)
 imapped = iroam imap
 \end{code}
 
-Here, I should note that |FunArrow| can be given an instance of |IMapping|.
-We simply ignore the index.
+Here, we should note that |FunArrow| can be given an instance of |IMapping|.
+We simply ignore the index argument.
 
 \begin{code}
 instance IMapping FunArrow where
@@ -200,7 +201,7 @@ example03 = over (mapped . imapped) toUpper ["foobar", "xyzzy"]
 
 To actually use indices, we need new concrete profunctor.
 The |IxFunArrow| takes a heterogeneous list, |NP I| (n-ary product),
-of indices in addition to the element.
+of indices in addition to the element as an argument of an arrow.
 
 \begin{code}
 newtype IxFunArrow is a b =
@@ -404,7 +405,7 @@ Interestingly, |Traversing CoixFunArrow| instance looks like
 |Mapping FunArrow|, and it seems to be impossible to write |Mapping IxFunArrow|.
 
 Anyway, next we define a coindexed |over|, which I unimaginatively call |jover|.
-Like in previous section, I start with a generic version first.
+Like in the previous section, I start with a generic version first.
 
 \begin{code}
 gen_jover
@@ -427,7 +428,7 @@ jover2 o f = gen_jover o (first plumb . f) where
     plumb (Right j) = S (Z (I j)) 
 \end{code}
 
-And now the most fun: the examples.
+And now the most fun: the coindexed optics examples.
 First we can recover the |mapMaybe| behavior:
 
 \begin{code}
@@ -439,7 +440,7 @@ example07 = jover jtraversed
 \end{code}
 
 And because we have separate coindexes in the type level list,
-we can filter on different levels of the structure!
+we can filter on the different levels of the structure!
 If we find a character |'y'|, we skip the whole
 word, otherwise we skip all vowels.
 
