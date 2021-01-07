@@ -5,6 +5,8 @@ author: Oleg Grenrus
 
 I originally posted these
 as a [Twitter thread](https://twitter.com/phadej/status/1346439299487641600).
+Its point is to illustrate that constant factors matter,
+not only the whether it is $\mathcal{O}(n)$, $\mathcal{O}(n \log n)$ or $\mathcal{O}(n^2)$ (though quadratic is quite bad quite soon).
 
 I have been playing with [`discrimination`](https://hackage.haskell.org/package/discrimination) package.
 
