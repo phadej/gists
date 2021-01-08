@@ -202,8 +202,8 @@ $$
 \begin{tabular}{l|cc}
 $\mathbf{op}$ & $\prod$ & $\sum$ \\
 \hline
-$\mathbf{op}_{\_ \mathop{\overset{\pi}:} A} B$                            & $\multimap$      & $\otimes$ \\
-$\mathbf{op}_{t  \mathop{\overset{\pi}:} \mathbb{B}\mathsf{ool}} \ldots$  & $\binampersand$  & $\oplus$
+$\mathbf{op}_{\_ \mathop{\overset{1}:} A} B$                            & $\multimap$      & $\otimes$ \\
+$\mathbf{op}_{t  \mathop{\overset{1}:} \mathbb{B}\mathsf{ool}} \ldots$  & $\binampersand$  & $\oplus$
 \end{tabular}
 $$
 
