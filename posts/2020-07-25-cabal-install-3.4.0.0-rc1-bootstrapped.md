@@ -20,13 +20,15 @@ Ideally the good parts of these will be encoded
 as CI setup scripts.
 
 ```
-curl -O https://raw.githubusercontent.com/haskell/cabal/725ca482d869e03be66bc845b39662ec0609bd99/release.py
-curl -O http://oleg.fi/cabal-install-3.4.0.0-rc4/Cabal-3.4.0.0.tar.gz
-curl -O http://oleg.fi/cabal-install-3.4.0.0-rc4/cabal-install-3.4.0.0.tar.gz
+mkdir cabal-3.4
+cd cabal-3.4
+curl -O https://raw.githubusercontent.com/haskell/cabal/master/release.py
+curl -O https://hackage.haskell.org/package/Cabal-3.4.0.0/Cabal-3.4.0.0.tar.gz
+curl -O https://hackage.haskell.org/package/cabal-install-3.4.0.0/candidate/cabal-install-3.4.0.0.tar.gz
 cat > SHA256SUMS <<EOF
 47f95c62b6ec25900ff391fccdbcb46dd87efca6a83d8e80d7834a2cee9158bc  release.py
-a1e9d803bf99c4989c82d63f6ae619740ece0282987dd3c8bae2fe158b85ed4c  Cabal-3.4.0.0.tar.gz
-0499406c277bcaa431a0666d3e5ea171ee5bd7d66e6cf48ff275452d0723bb8b  cabal-install-3.4.0.0.tar.gz
+b879998a96763b30fd8a1a5f4e94923dcefa73c4da700813f2884f47026541fd  Cabal-3.4.0.0.tar.gz
+1980ef3fb30001ca8cf830c4cae1356f6065f4fea787c7786c7200754ba73e97  cabal-install-3.4.0.0.tar.gz
 EOF
 sha256sum -c SHA256SUMS
 ```
@@ -179,6 +181,12 @@ They are quite simialr to above (or below).
 
 Please tell whether the resulting binary built on sierra
 
+```
+
+time python3 release.py -w ghc-8.6.3 -C cabal --tarlib=Cabal-3.4.0.0.tar.gz --tarexe=cabal-install-3.4.0.0.tar.gz
+
+```
+
 
 Windows
 -------
@@ -307,6 +315,10 @@ git clone https://github.com/haskell/cabal.git
 cd cabal
 git checkout 3.4
 time python3.8 release.py -w /opt/ghc/8.10.1/bin/ghc -C $HOME/cabal-3.4.0.0-bootstrapped/cabal
+
+time python3.8 release.py -w /opt/ghc/8.10.1/bin/ghc -C $HOME/cabal-3.4.0.0-bootstrapped/cabal --tarlib Cabal-*.tar.gz --tarexe cabal-install-*.tar.gz --enable-static-executable --disable-ofd
+
+
 ```
 
 
@@ -409,6 +421,7 @@ git log -1
 time python3.8 release.py -w /opt/ghc/8.8.4/bin/ghc -C $HOME/cabal-3.4.0.0/cabal --enable-static-executable --disable-ofd
 
 time python3.8 release.py -w /opt/ghc/8.8.4/bin/ghc -C $HOME/cabal-3.4.0.0/cabal --tarlib Cabal-*.tar.gz --tarexe cabal-install-*.tar.gz --enable-static-executable --disable-ofd
+
 ```
 
 ```
@@ -471,4 +484,5 @@ time python3.7 release.py -w /opt/ghc/8.8.4/bin/ghc -C $HOME/cabal-3.4.0.0-boots
 
 
 time python3.7 release.py -w /opt/ghc/8.8.4/bin/ghc -C $HOME/cabal-3.4.0.0-bootstrapped/cabal --tarlib=Cabal-3.4.0.0.tar.gz --tarexe=cabal-install-3.4.0.0.tar.gz
+
 ```
