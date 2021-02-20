@@ -316,7 +316,7 @@ cd cabal
 git checkout 3.4
 time python3.8 release.py -w /opt/ghc/8.10.1/bin/ghc -C $HOME/cabal-3.4.0.0-bootstrapped/cabal
 
-time python3.8 release.py -w /opt/ghc/8.10.1/bin/ghc -C $HOME/cabal-3.4.0.0-bootstrapped/cabal --tarlib Cabal-*.tar.gz --tarexe cabal-install-*.tar.gz --enable-static-executable --disable-ofd
+time python3.8 release.py -w /opt/ghc/8.10.1/bin/ghc -C $HOME/cabal-3.4.0.0-bootstrapped/cabal --tarlib Cabal-*.tar.gz --tarexe cabal-install-*.tar.gz
 
 
 ```
