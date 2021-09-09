@@ -1,0 +1,202 @@
+Recently Ryan Scott wrote \href{https://ryanglscott.github.io/2021/08/22/leibniz-equality-in-haskell-part-1/}{an article} about
+Leibniz (and Martin-Löf) equality.
+Interestingly we can do the same thing for coercions (which are representational equalities).
+That exercise stumbles on the first-orderness of role system in GHC,
+making it a good example to be solved.
+(I'd like to have a solution, but I only have a problem).
+\begin{code}
+{-# LANGUAGE GADTs, RankNTypes, QuantifiedConstraints #-}
+{-# LANGUAGE StandaloneKindSignatures, PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables, TypeOperators, TypeApplications #-}
+import Data.Coerce (Coercible, coerce)
+import Data.Kind (Type)
+import Data.Functor.Identity (Identity (..))
+\end{code}
+
+The |Coercion| type defined in \href{https://hackage.haskell.org/package/base-4.15.0.0/docs/Data-Type-Coercion.html}{|Data.Type.Coercion|} is akin to Martin-Löf
+equality |(:~:)|:
+
+\begin{code}
+type Coercion :: k -> k -> Type
+data Coercion a b where
+  Coercion :: Coercible a b => Coercion a b
+\end{code}
+
+compare that to alternative way\footnote{
+I'm not sure that the representation of this and original variant is exactly the same,
+i.e. whether the equality constraint is unboxed in both variants.
+That details is not important for us now.
+} to write |(:~:)|:
+\begin{code}
+type (:~:) :: k -> k -> Type
+data a :~: b where
+  Refl :: a ~ b => a :~: b
+\end{code}
+
+There is an analog of \href{https://hackage.haskell.org/package/base-4.15.0.0/docs/Data-Type-Equality.html#v:castWith}{|castWith|} function,
+called \href{https://hackage.haskell.org/package/base-4.15.0.0/docs/Data-Type-Coercion.html#v:coerceWith}{|coerceWith|},
+a type-safe cast using representational equality:
+\begin{code}
+coerceWith' :: Coercion a b -> a -> b
+coerceWith' Coercion x = coerce x
+\end{code}
+
+Symmetry, transitivity etc combinators are defined similarly by pattern
+matching on the constructor.
+
+\subsection{Leibniz coercion}
+
+What would Leibniz variant look like?
+Recall \href{https://en.wikipedia.org/wiki/Identity_of_indiscernibles}{identity
+of indiscernibles}: two objects are equal if and only if they satisfy the same
+properties. We encode that in Haskell as:
+
+\begin{code}
+type (:=) :: k -> k -> Type
+newtype a := b = Leibniz { subst' :: forall c. c a -> c b }
+\end{code}
+
+where |c| is \emph{all properties}, or \emph{contexts}.
+For |Coercion| we need to restrict that to the \emph{representational}%
+\footnote{\href{https://ryanglscott.github.io/2018/03/04/how-quantifiedconstraints-can-let-us-put-join-back-in-monad/}{Another Ryan's blog post} has a section about roles. \href{https://downloads.haskell.org/ghc/9.0.1/docs/html/users_guide/exts/roles.html}{GHC manual} is also a good source of knowledge.}
+contexts.
+We can encode representational contexts
+using \texttt{QuantifiedConstraints} extension:
+
+\begin{code}
+type Koerzion :: k -> k -> Type
+newtype Koerzion a b = Koerzion
+  { subst :: forall c. (forall x y. Coercible x y => Coercible (c x) (c y))
+          => c a -> c b
+  }
+\end{code}
+
+(Leibniz was German, and this is the first name I thought of. I do not know German, I'm sorry).
+
+Another way to think about this is:
+\begin{itemize}
+\item Everything should respect the nominal equality.
+\item However, only representational things respect representational equality, i.e. coercions.
+\end{itemize}
+
+Next, lets defined define some basic combinators.
+Reflexivity is defined similarly as for the (nominal) Leibniz equality:
+
+\begin{code}
+refl :: Koerzion a a
+refl = Koerzion id
+\end{code}
+
+We can generalise it to arbitrary |Coercible| types, that is the point of coercions:
+
+\begin{code}
+koerzion :: Coercible a b => Koerzion a b
+koerzion = Koerzion coerce
+\end{code}
+
+The type-safe cast do not pose any problems either:
+
+\begin{code}
+coerceWith :: Koerzion a b -> a -> b
+coerceWith ab a = runIdentity (subst ab (Identity a))
+\end{code}
+
+With transitivity we step into a problem:
+
+\begin{code}
+trans :: forall a b c. Koerzion a b -> Koerzion b c -> Koerzion a c
+trans ab bc = subst bc ab
+\end{code}
+
+doesn't work. Let's ignore a problem for now,
+and follow \href{https://www.reddit.com/r/haskell/comments/pjkog2/leibniz_equality_in_haskell_part_1/hbxy77x?utm_source=share&utm_medium=web2x&context=3}{David Feuer comment}
+and defined transitivity as:
+\begin{code}
+trans :: forall a b c. Koerzion a b -> Koerzion b c -> Koerzion a c
+trans ab bc = Koerzion (subst bc . subst ab)
+\end{code}
+
+So far so good. We have defined reflexivity, transitivity, and type-safe cast.
+
+\subsection{Symmetry}
+
+If we try to define symmetry, following the nominal Leibniz equality
+example:
+
+\begin{code}
+type Symm :: k -> k -> Type
+newtype Symm a b = Symm { unsymm :: Koerzion b a }
+
+sym :: forall a b. Koerzion a b -> Koerzion b a
+sym ab = unsymm (subst ab (Symm refl))
+\end{code}
+
+we get an error (which is similar to what we get in the first transitivity attempt):
+
+\begin{verbatim}
+    • Couldn't match representation of type: c y
+                               with that of: c x
+        arising from a use of ‘subst’
+\end{verbatim}
+
+though I'd expected
+
+\begin{verbatim}
+    • Couldn't match representation of type: Symm a a
+                               with that of: Symm a b
+        arising from a use of ‘subst’
+\end{verbatim}
+
+However, I believe that it caused by the same underlying reason:
+|Koerzion| roles are not representational:
+
+\begin{verbatim}
+*Main> :i Koerzion 
+type role Koerzion nominal nominal nominal
+type Koerzion :: forall k. k -> k -> *
+\end{verbatim}
+
+In comparison, GADT variant |Coercion| is:
+
+\begin{verbatim}
+*Main> :i Coercion
+type Coercion :: forall k. k -> k -> *
+type role Coercion nominal representational representational
+\end{verbatim}
+
+This highlights the first-orderness of the role system.
+|Koerzion| is morally representational in |a| and |b|, but GHC
+doesn't want to infer it. (And there is no way to say \emph{trust me}).
+The \texttt{QuantifiedConstraints} "hack" to internalize
+representational contexts is not integrated into roles system and 
+|Coercible| constraint solver (AFAIK), so the things do not work out.
+
+\subsection{Equivalence of Leibniz and Martin-Löf-like coercions}
+
+However, |Coercion| and |Koerzion| are equivalent:
+
+\begin{code}
+toKoerzion :: Coercion a b -> Koerzion a b
+toKoerzion Coercion = Koerzion coerce
+
+fromKoerzion :: forall a b. Koerzion a b -> Coercion a b
+fromKoerzion ab = subst ab @(Coercion a) (Coercion :: Coercion a a)
+\end{code}
+
+And we can define |sym| via that equivalence:
+
+\begin{code}
+sym :: forall a b. Koerzion a b -> Koerzion b a
+sym = toKoerzion . sym' . fromKoerzion
+
+sym' :: Coercion a b -> Coercion b a
+sym' Coercion = Coercion
+\end{code}
+
+which justifies my "|Koerzion| is morally representational" claim,
+because |Coercion| is representational, |Koerzion| should be too.
+
+It would be very nice if GHC had higher-order roles.
+There are plenty of practical examples which run into the same
+problem (e.g. \href{https://hackage.haskell.org/package/pipes-4.3.16/docs/Pipes-Core.html#t:Proxy}{the core type in \texttt{pipes}} is not representational in any of its type arguments, though it should be).
+But maybe this |Koerzion| example will nerd-snip someone to solve this problem :)
