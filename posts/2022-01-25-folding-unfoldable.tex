@@ -1,0 +1,127 @@
+You may be aware of |Foldable| type-class.
+It's quite useful one. For example, instead of writing your own |sum|\footnote{it's already that way in \texttt{base}, check yourself \url{https://hackage.haskell.org/package/base-4.16.0.0/docs/src/GHC.List.html#sum}} as
+
+\begin{code}
+sum' :: Num a => [a] -> a
+sum' = Data.List.foldl' (+) 0
+\end{code}
+
+you may generalize it to arbitrary |Foldable|\footnote{Though you probably should write it using strict |foldMap'| as in base \url{https://hackage.haskell.org/package/base-4.16.0.0/docs/src/Data.Foldable.html#sum} to let container decide how to do it best}:
+
+\begin{code}
+sum' :: (Foldable f, Num a) => f a -> a
+sum' = Data.Foldable.foldl' (+) 0
+\end{code}
+
+And the everything would be great...
+
+... except if your data comes in unboxed vector.
+You may try to use that generic sum algorithm:
+
+\begin{code}
+values :: U.Vector Double
+values = U.fromList [1,2,3,4,5,6,7,7,7]
+
+result :: Double
+result = sum' values
+\end{code}
+
+and then GHC just says, without further explanation
+
+\begin{verbatim}
+No instance for (Foldable U.Vector) arising from a use of ‘sum'’
+\end{verbatim}
+
+"Why not?!" you wonder.
+
+Unboxed vectors are backed by bytearrays, so you need an |Unbox| instance
+to be able to even \emph{read} any values from there.
+(That's different from e.g. |Set|, which is |Foldable|, as you can walk over
+ |Set| without having |Ord| instance for the elements).
+
+Bummer.
+
+One idea is to
+
+\begin{code}
+data Bundle a where
+    Bundle :: U.Unbox a => U.Vector a -> Bundle a
+\end{code}
+
+When the |Unbox| instance is next to the data, we will be able to write |Foldable| instance:
+pattern match on the |Bundle|, use that "local" instance to fold.
+However, people have told me, that sometimes it doesn't work that well:
+GHC may not specialize things, even the dictionary is (almost) right there.
+Though in my small experiments it did:
+
+\begin{code}
+sumU :: (Num a, U.Unbox a) => U.Vector a -> a
+sumU xs = sum' (Bundle xs)
+\end{code}
+
+produced nice loops.
+
+Yet, having to bundle instance feels somehow wrong.
+Distant \emph{data type contexts} vibes, brr..
+
+There is another way to make |Foldable| work, with a
+
+\begin{code}
+data Hack a b where
+    Hack :: U.Vector a -> Hack a a
+\end{code}
+
+This is a two type-parameter wrapper, but the types are always the same!
+(I wish that could be a \texttt{newtype}).
+The |Foldable| instance is simply:
+
+\begin{code}
+instance U.Unbox a => Foldable (Hack a) where
+    foldr f z (Hack v)  = U.foldr f z v
+    foldl' f z (Hack v) = U.foldl' f z v
+
+    ...
+\end{code}
+
+and specialized |sum'| for unboxed vector looks the same as with |Bundle|:
+
+\begin{code}
+sumU :: (Num a, U.Unbox a) => U.Vector a -> a
+sumU xs = sum' (Hack xs)
+\end{code}
+
+but now |Unbox| instance comes from the "outside", it's needed by |Foldable|,
+not to wrap vector in |Hack|.
+When GHC sees just |Foldable (Hack X) ...| it could already start simplifying
+stuff, if it knows something about |X| (i.e. its |Unbox| instance),
+without waiting to see what the members of the instance are applied to!
+
+We could write also write
+
+\begin{code}
+{-# SPECIALIZE instance Foldable (UV Double) #-}
+\end{code}
+
+to force GHC do some work in advance. We couldn't with |Bundle| approach.
+
+Is this |Hack| terrible or terrific? I'm not sure, yet.
+
+Anyhow, that's all I have this time.
+This (just a little) tongue-in-cheek post is "inspired" by the fact
+that \texttt{statistics} package wants unboxed vectors everywhere,
+for "performance" reasons, and that is soooo inconvenient.
+
+Please, use |Foldable| for inputs you will fold over anyway.
+(Asking for a selector function, like |foldMap| would avoid creating intermediate structures!).
+People can choose to |Bundle| or |Hack| their way around to provide unboxed (or storable) vectors or
+primarrays to your algorithm, and others don't need to suffer when they play with your lib in the GHCi.
+
+
+P.S. I leave this here:
+
+\begin{code}
+data HackText a where
+    HackText :: Text -> HackText Char
+\end{code}
+
+P.P.S. I know there is |MonoFoldable|, and \texttt{lens} with its |Fold|s and a lot of other stuff. But |Foldable| is right there, in our |Prelude|!
