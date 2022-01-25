@@ -6,7 +6,7 @@ sum' :: Num a => [a] -> a
 sum' = Data.List.foldl' (+) 0
 \end{code}
 
-you may generalize it to arbitrary |Foldable|\footnote{Though you probably should write it using strict |foldMap'| as in base \url{https://hackage.haskell.org/package/base-4.16.0.0/docs/src/Data.Foldable.html#sum} to let container decide how to do it best}:
+you may generalize it to an arbitrary |Foldable|\footnote{Though you probably should write it using strict |foldMap'| as in base \url{https://hackage.haskell.org/package/base-4.16.0.0/docs/src/Data.Foldable.html#sum} to let container decide how to do it best}:
 
 \begin{code}
 sum' :: (Foldable f, Num a) => f a -> a
@@ -26,7 +26,7 @@ result :: Double
 result = sum' values
 \end{code}
 
-and then GHC just says, without further explanation
+and then GHC says, without further explanation:
 
 \begin{verbatim}
 No instance for (Foldable U.Vector) arising from a use of ‘sum'’
@@ -35,8 +35,8 @@ No instance for (Foldable U.Vector) arising from a use of ‘sum'’
 "Why not?!" you wonder.
 
 Unboxed vectors are backed by bytearrays, so you need an |Unbox| instance
-to be able to even \emph{read} any values from there.
-(That's different from e.g. |Set|, which is |Foldable|, as you can walk over
+to be able to \emph{read} (or write) any values from there.
+(That's different from e.g. |Set|, which is |Foldable|, as you can walk the structure of
  |Set| without having |Ord| instance for the elements).
 
 Bummer.
@@ -49,7 +49,7 @@ data Bundle a where
 \end{code}
 
 When the |Unbox| instance is next to the data, we will be able to write |Foldable| instance:
-pattern match on the |Bundle|, use that "local" instance to fold.
+pattern match on the |Bundle|, use the "local" instance to fold.
 However, people have told me, that sometimes it doesn't work that well:
 GHC may not specialize things, even the dictionary is (almost) right there.
 Though in my small experiments it did:
@@ -90,7 +90,7 @@ sumU :: (Num a, U.Unbox a) => U.Vector a -> a
 sumU xs = sum' (Hack xs)
 \end{code}
 
-but now |Unbox| instance comes from the "outside", it's needed by |Foldable|,
+but now |Unbox| instance comes from the "outside": it's required by |Foldable (Hack a)| instance,
 not to wrap vector in |Hack|.
 When GHC sees just |Foldable (Hack X) ...| it could already start simplifying
 stuff, if it knows something about |X| (i.e. its |Unbox| instance),
@@ -125,3 +125,20 @@ data HackText a where
 \end{code}
 
 P.P.S. I know there is |MonoFoldable|, and \texttt{lens} with its |Fold|s and a lot of other stuff. But |Foldable| is right there, in our |Prelude|!
+
+\begin{code}
+-- e.g. with optics' Each:
+data O s a b where
+    O :: s -> O s a a
+
+instance Each i s s a a => Foldable (O s a) where
+    foldMap f  (O x) = foldMapOf each f   x
+    foldr  f z (O x) = foldrOf   each f z x
+    foldl' f z (O x) = foldlOf'  each f z x
+
+    {-# SPECIALIZE instance Foldable (O (U.Vector Double) Double) #-}
+
+-- works too
+sumO :: (Num a, U.Unbox a) => U.Vector a -> a
+sumO xs = sum' (O xs)
+\end{code}
