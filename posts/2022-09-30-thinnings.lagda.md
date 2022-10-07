@@ -1,6 +1,7 @@
 ---
 title: Three different thinnings
 author: Oleg Grenrus
+tags: agda
 ---
 
 I was lately again thinking about thinnings.
@@ -71,7 +72,7 @@ Which would look like:
   \node[anchor=east] at (C) {$2$};
   \node[anchor=east] at (D) {$3$};
   \node[anchor=east] at (E) {$4$};
-  
+
   \node[circle, draw, fill=black, inner sep=0pt, minimum width=4pt] (X) at (2,0.00) {};
   \node[circle, draw, fill=black, inner sep=0pt, minimum width=4pt] (Y) at (2,0.50) {};
   \node[circle, draw, fill=black, inner sep=0pt, minimum width=4pt] (Z) at (2,1.00) {};
@@ -138,7 +139,7 @@ In his work Andras Kovacs makes a variant swapping `nilₒ` for `idₒ`.
 However then thinnings won't have unique representation anymore and proofs become more inconvenient to write.
 
 We can make a special case for identity thinning without sacrificing unique representation for the cost of slightly more complicated definition.
-We just need to consider identity thinning and non-identity ones separately. 
+We just need to consider identity thinning and non-identity ones separately.
 
 ```agda
 data _⊏ₛ_ : ℕ → ℕ → Type where
@@ -832,4 +833,22 @@ Now, if we prove properties of these operations,
 e.g. identity laws, composition associativity, or that composition and action commute, it would be enough
 to prove these for the orthodox implementation, then we can simply transport the proofs.
 
-In other words, whatever we prove about one structure will hold for two others.
+In other words, whatever we prove about one structure will hold for two others, like `idₕ-unique` in previous section.
+
+Some proofs are simple:
+
+```agda
+thin-idₕ : (x : Var n) → thinₕ idₕ x ≡ x
+thin-idₕ x = refl
+```
+
+but we can get them through the equality anyway:
+
+```agda
+thin-idₕ' : (x : Var n) → thinₕ idₕ x ≡ x
+thin-idₕ' {n} x = subst
+  {A = Σ _ (λ _⊑_ → Action n n _⊑_ × (n ⊑ n))}                -- structure
+  (λ { (_⊑_ , thin , id) → thin id x ≡ x })                   -- motif
+  (λ i → Orth≡HIT i , thinₒ≡thinₕ i , CatOps-Orth≡HIT i .fst) -- proof that structures are equal
+  (thin-idₒ x)                                                -- proof to transport
+```
