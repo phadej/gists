@@ -108,6 +108,7 @@ data FunList a b t = Done t
 -- this can be done more efficent using Curried Yoneda,
 -- without using `append`.
 -- See https://dl.acm.org/doi/10.1145/3236780
+-- and https://gist.github.com/phadej/f5e8107e303265241e6b7b556db5ca48
 funList :: (forall f. Applicative f => (a -> f b) -> s -> f t)
         -> s -> FunList a b t
 funList trav s = trav singleton s
