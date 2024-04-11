@@ -56,7 +56,7 @@ GHC developers are filling the cracks: For example we'll soon [^visqua] get a `f
 mention "Partial implementation of the [GHC Proposal #281](https://github.com/ghc-proposals/ghc-proposals/pull/281), allowing visible quantification to be used in the types of terms."
 
 (Agda also has "different" quantifiers:
-explicit `(x : A) -> ...` and implicit `{y : B} -> ...` dependent quantifiers, and [erased variants](https://agda.readthedocs.io/en/v2.6.4.3/language/runtime-irrelevance.html) look like `(x : @0 A) -> ...` and `(y : @0 B) -> ...`.)
+explicit `(x : A) -> ...` and implicit `{y : B} -> ...` dependent quantifiers, and [erased variants](https://agda.readthedocs.io/en/v2.6.4.3/language/runtime-irrelevance.html) look like `(@0 x : A) -> ...` and `{@0 y : B} -> ...`.)
 
 In Haskell, if we have a term with implicit quantifier (`foo :: forall a. ...`), we can use `TypeApplications` syntax to apply the argument explicitly:
 
@@ -200,6 +200,15 @@ error. With `NoMonomophismRestriction` we have
 ghci> :t fooLen
 fooLen :: Num i => i
 ```
+
+Another, a lot simpler option, is to simply remember whether the symbols' type was inferred, and issue a warning if `TypeApplications` is used with such symbol in application head. So if user writes
+
+```haskell
+... (g @Int @Char ...)
+```
+
+GHC would warn that `g` has inferred type, and the `TypeApplications` with `g` are brittle. The solution is to give `g` a type signature.
+This warning could be issued early in a pipeline (maybe already in renamer), so it would explain further (possibly cryptic) type errors.
 
 Let me summarise the above: If we could apply inferred variables, i.e. use curly brace application syntax, we would have complete explicit `forall a ->`, implicit `forall a.` and *more implicit* `forall {a}.` dependent quantifiers.
 Currently the `forall {a}.` quantifier is incomplete: we can abstract, but we cannot apply.
