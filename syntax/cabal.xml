@@ -11,6 +11,8 @@
 
 		<!-- conditionals -->
 		<WordDetect attribute="Stanza" context="cond" String="if" insensitive="true"/>
+		<WordDetect attribute="Stanza" context="cond" String="else" insensitive="true"/>
+		<WordDetect attribute="Stanza" context="#stay" String="flag" insensitive="true"/>
 		<WordDetect attribute="Stanza" context="#stay" String="library" insensitive="true"/>
 		<WordDetect attribute="Stanza" context="#stay" String="executable" insensitive="true"/>
 
@@ -23,6 +25,9 @@
 		<WordDetect attribute="FieldName" String="reexported-modules" insensitive="true" />
 		<WordDetect attribute="FieldName" String="signatures" insensitive="true" />
 		<WordDetect attribute="FieldName" String="tested-with" insensitive="true" />
+		<WordDetect attribute="FieldName" String="description" insensitive="true" />
+		<WordDetect attribute="FieldName" String="manual" insensitive="true" />
+		<WordDetect attribute="FieldName" String="default" insensitive="true" />
 
 		<!-- version ranges -->
         <RegExpr attribute="VersionRange" String="(>=|\^>=|==|&lt;)\s*\d+(\.\d+)*" />
